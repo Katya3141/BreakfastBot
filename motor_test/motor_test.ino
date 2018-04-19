@@ -7,15 +7,44 @@
 #define STBYAB 33
 #define SDA 21
 #define SCL 22
+
+#define lTrig 16
+#define lEcho 17
+#define rTrig 14
+#define rEcho 12
+#define fTrig 5
+#define fEcho 15
+
 #define BRAKE 0
 #define FORWARD 1
 #define BACKWARDS 2
 #define TURNRIGHT 3
 #define TURNLEFT 4
 
+
 #include <WiFi.h>
 #include <adp5350.h>
 ADP5350 adp;
+
+float lDist, rDist, fDist, avgLeft, avgRight, avgFront;
+float lastLDist = -1;
+float lastRDist = -1;
+const float W = 0.4;
+
+float getDist(int trig, int echo) {
+  float duration, distance;
+  
+  digitalWrite(trig, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trig, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trig, LOW);
+
+  duration = pulseIn(echo, HIGH);
+  distance = (duration/2)/29.1;
+
+  return distance;
+}
 
 class Motor {
 
@@ -103,7 +132,7 @@ class Robot {
 
   void curve(int spd, int curve) {
     if (curve < 0) {
-      left.fwd(spd - curve);
+      left.fwd(spd + curve);
       right.fwd(spd);
     }
     else {
@@ -118,7 +147,7 @@ class Robot {
       right.back(spd - curve);
     }
     else {
-      left.back(spd - curve);
+      left.back(spd + curve);
       right.back(spd);
     }
   }
@@ -142,6 +171,21 @@ void setup() {
   adp.enableFuelGauge(1); //turn on voltage reading
   adp.enableLDO(1, 1); //Turn on LDO1
   adp.enableLDO(2, 1); //Turn on LDO2
+  adp.enableLDO(3, 1);
+
+
+  pinMode(lTrig, OUTPUT);
+  pinMode(lEcho, INPUT);
+  pinMode(rTrig, OUTPUT);
+  pinMode(rEcho, INPUT);
+  pinMode(fTrig, OUTPUT);
+  pinMode(fEcho, INPUT);
+  do {
+    avgLeft = getDist(lTrig,lEcho);
+    avgRight = getDist(rTrig,rEcho);
+    avgFront = getDist(fTrig,fEcho);
+  } while(avgLeft>400 || avgRight>400 || avgFront>400);
+
 
   delay(100); //wait a bit (100 ms)
   WiFi.begin("MIT"); //attempt to connect to wifi
@@ -159,6 +203,7 @@ void setup() {
     Serial.println(WiFi.status());
     ESP.restart(); // restart the ESP
   }
+
   timer = millis();
 }
 
@@ -173,7 +218,7 @@ String getInstruction(){
     unsigned long count = millis();
     while (client.connected()) { //while we remain connected read out data coming back
       String line = client.readStringUntil('\n');
-      Serial.println(line);
+      //Serial.println(line);
       if (line == "\r") { //found a blank line!
         //headers have been received! (indicated by blank line)
         break;
@@ -195,7 +240,9 @@ String getInstruction(){
 }
 
 void loop() {
+  
   Serial.println((String) adp.batteryVoltage());
+  
   int temp = state;
   state = getInstruction().toInt();
   if (state != temp) {
@@ -220,6 +267,47 @@ void loop() {
     timer = millis();
   }
   Serial.println(String(state));
+  
+
+/*
+  lDist = getDist(lTrig,lEcho);
+  rDist = getDist(rTrig,rEcho);
+  fDist = getDist(fTrig,fEcho);
+
+  if(lDist<400)
+    avgLeft = W*avgLeft + (1-W)*lDist;
+  if(rDist<400)
+    avgRight = W*avgRight + (1-W)*rDist;
+  if(fDist<400)
+    avgFront = W*avgFront + (1-W)*fDist;
+*/
+    
+/*
+  Serial.println("Left: "+String(avgLeft));
+  Serial.println("Right: "+String(avgRight));
+  Serial.println("Front: "+String(avgFront));
+*/
+
+/*
+  if (lastLDist != -1) {
+    if (avgLeft > avgRight) {
+      float delta = avgRight - lastRDist;
+      r.curve(170, 60 * delta);
+      Serial.println(String(60*delta));
+    }
+    else {
+      float delta = avgLeft - lastLDist;
+      r.curve(170, -60 * delta);
+      Serial.println(String(-60*delta));
+    }
+  }
+  
+  lastRDist = avgRight;
+  lastLDist = avgLeft;
+  */
+
+  while (millis() - timer < 50);
+  timer = millis();
 }
    
 
