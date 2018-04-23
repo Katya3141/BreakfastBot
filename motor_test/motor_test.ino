@@ -8,10 +8,10 @@
 #define SDA 21
 #define SCL 22
 
-#define lTrig 16
-#define lEcho 17
-#define rTrig 14
-#define rEcho 12
+#define r2Trig 16
+#define r2Echo 17
+#define r1Trig 14
+#define r1Echo 12
 #define fTrig 5
 #define fEcho 15
 
@@ -23,13 +23,13 @@
 
 
 #include <WiFi.h>
-#include <adp5350.h>
-ADP5350 adp;
 
-float lDist, rDist, fDist, avgLeft, avgRight, avgFront;
-float lastLDist = -1;
-float lastRDist = -1;
-const float W = 0.4;
+float r2Dist, r1Dist, fDist, avgRight2, avgRight1, avgFront;
+float lastr2Dist = -1;
+float lastr1Dist = -1;
+const float W = 0.7;
+const float offset = -0.32;
+const float aggression = 25;
 
 float getDist(int trig, int echo) {
   float duration, distance;
@@ -161,30 +161,23 @@ int state = 0;
 unsigned long timer;
 
 void setup() {
-  Serial.begin(115200); //begin serial comms
-  while (adp.info() != 27){ //set up ADP5350
-    delay(50);
-    Serial.print("ADP5350 not connected: ");
-    Serial.println(adp.info());
-  }
-  adp.setCharger(1); //Turn on charger
-  adp.enableFuelGauge(1); //turn on voltage reading
-  adp.enableLDO(1, 1); //Turn on LDO1
-  adp.enableLDO(2, 1); //Turn on LDO2
-  adp.enableLDO(3, 1);
 
+  Serial.begin(115200);
 
-  pinMode(lTrig, OUTPUT);
-  pinMode(lEcho, INPUT);
-  pinMode(rTrig, OUTPUT);
-  pinMode(rEcho, INPUT);
+  pinMode(r2Trig, OUTPUT);
+  pinMode(r2Echo, INPUT);
+  pinMode(r1Trig, OUTPUT);
+  pinMode(r1Echo, INPUT);
   pinMode(fTrig, OUTPUT);
   pinMode(fEcho, INPUT);
+
+
   do {
-    avgLeft = getDist(lTrig,lEcho);
-    avgRight = getDist(rTrig,rEcho);
+    avgRight2 = getDist(r2Trig,r2Echo);
+    avgRight1 = getDist(r1Trig,r1Echo);
     avgFront = getDist(fTrig,fEcho);
-  } while(avgLeft>400 || avgRight>400 || avgFront>400);
+  } while(avgRight1>400 || avgRight2>400 || avgFront>400);
+
 
 
   delay(100); //wait a bit (100 ms)
@@ -240,8 +233,10 @@ String getInstruction(){
 }
 
 void loop() {
-  
-  Serial.println((String) adp.batteryVoltage());
+
+  // wifi control
+
+  /*
   
   int temp = state;
   state = getInstruction().toInt();
@@ -267,47 +262,36 @@ void loop() {
     timer = millis();
   }
   Serial.println(String(state));
-  
 
-/*
-  lDist = getDist(lTrig,lEcho);
-  rDist = getDist(rTrig,rEcho);
+  */
+
+  // 2 sensors on one side, going straight
+
+  /*
+  r2Dist = getDist(r2Trig,r2Echo);
+  r1Dist = getDist(r1Trig,r1Echo);
   fDist = getDist(fTrig,fEcho);
 
-  if(lDist<400)
-    avgLeft = W*avgLeft + (1-W)*lDist;
-  if(rDist<400)
-    avgRight = W*avgRight + (1-W)*rDist;
+  if(r2Dist<400)
+    avgRight2 = W*avgRight2 + (1-W)*r2Dist;
+  if(r1Dist<400)
+    avgRight1 = W*avgRight1 + (1-W)*r1Dist;
   if(fDist<400)
     avgFront = W*avgFront + (1-W)*fDist;
-*/
-    
-/*
-  Serial.println("Left: "+String(avgLeft));
-  Serial.println("Right: "+String(avgRight));
-  Serial.println("Front: "+String(avgFront));
-*/
 
-/*
-  if (lastLDist != -1) {
-    if (avgLeft > avgRight) {
-      float delta = avgRight - lastRDist;
-      r.curve(170, 60 * delta);
-      Serial.println(String(60*delta));
-    }
-    else {
-      float delta = avgLeft - lastLDist;
-      r.curve(170, -60 * delta);
-      Serial.println(String(-60*delta));
-    }
-  }
+
+  int c = aggression * (avgRight1 - avgRight2 + offset);
   
-  lastRDist = avgRight;
-  lastLDist = avgLeft;
-  */
+  if (r2Dist < 25 || r1Dist < 25) {
+    r.curve(250,-65);
+  }
+  else {
+    r.curve(250, c);
+  }
 
   while (millis() - timer < 50);
   timer = millis();
+  */
 }
    
 
