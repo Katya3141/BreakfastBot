@@ -24,12 +24,17 @@
 
 #include <WiFi.h>
 
-float r2Dist, r1Dist, fDist, avgRight2, avgRight1, avgFront;
-float lastr2Dist = -1;
-float lastr1Dist = -1;
-const float W = 0.7;
-const float offset = -0.32;
-const float aggression = 25;
+float r2Dist, r1Dist, fDist;
+
+float p, i=0, d;
+const float p_w = 4;
+const float i_w = 0.0001;
+const float d_w = 1000;
+float last_error = 0;
+
+int state = 0;
+unsigned long timer;
+unsigned long timer2;
 
 float getDist(int trig, int echo) {
   float duration, distance;
@@ -157,9 +162,6 @@ Motor A(AIN1, AIN2, PWMA, 0, STBYAB);
 Motor B(BIN1, BIN2, PWMB, 1, STBYAB);
 Robot r(A, B);
 
-int state = 0;
-unsigned long timer;
-
 void setup() {
 
   Serial.begin(115200);
@@ -170,15 +172,6 @@ void setup() {
   pinMode(r1Echo, INPUT);
   pinMode(fTrig, OUTPUT);
   pinMode(fEcho, INPUT);
-
-
-  do {
-    avgRight2 = getDist(r2Trig,r2Echo);
-    avgRight1 = getDist(r1Trig,r1Echo);
-    avgFront = getDist(fTrig,fEcho);
-  } while(avgRight1>400 || avgRight2>400 || avgFront>400);
-
-
 
   delay(100); //wait a bit (100 ms)
   WiFi.begin("MIT"); //attempt to connect to wifi
@@ -198,6 +191,7 @@ void setup() {
   }
 
   timer = millis();
+  timer2 = millis();
 }
 
 String getInstruction(){
@@ -265,33 +259,35 @@ void loop() {
 
   */
 
-  // 2 sensors on one side, going straight
-
-  /*
-  r2Dist = getDist(r2Trig,r2Echo);
-  r1Dist = getDist(r1Trig,r1Echo);
-  fDist = getDist(fTrig,fEcho);
-
-  if(r2Dist<400)
-    avgRight2 = W*avgRight2 + (1-W)*r2Dist;
-  if(r1Dist<400)
-    avgRight1 = W*avgRight1 + (1-W)*r1Dist;
-  if(fDist<400)
-    avgFront = W*avgFront + (1-W)*fDist;
-
-
-  int c = aggression * (avgRight1 - avgRight2 + offset);
   
-  if (r2Dist < 25 || r1Dist < 25) {
-    r.curve(250,-65);
+  r1Dist = getDist(r1Trig,r1Echo);
+
+  float error = r1Dist - 30;
+    
+  if (r1Dist < 200 && abs(error - last_error) < 35) {
+    p = p_w * error;
+    d = d_w * (error - last_error) / (millis() - timer2);
+    i += i_w * error * (millis() - timer2);
+
+    timer2 = millis();
+    last_error = error;
+
+    Serial.print(p);
+    Serial.print(" ");
+    Serial.print(d);
+    Serial.print(" ");
+    Serial.println(i);
+    
+    float c = p + d + i;
+    r.curve(150, c);
   }
   else {
-    r.curve(250, c);
+    r.brake();
   }
 
   while (millis() - timer < 50);
   timer = millis();
-  */
+  
 }
    
 
