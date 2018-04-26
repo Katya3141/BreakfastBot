@@ -27,10 +27,11 @@
 float r2Dist, r1Dist, fDist;
 
 float p, i=0, d;
-const float p_w = 4;
-const float i_w = 0.0001;
-const float d_w = 1000;
+float p_w = 4;
+float i_w = 0.0001;
+float d_w = 1000;
 float last_error = 0;
+int count = 0;
 
 int state = 0;
 unsigned long timer;
@@ -190,6 +191,14 @@ void setup() {
     ESP.restart(); // restart the ESP
   }
 
+  String weights = getWeights();
+  int space1 = weights.indexOf(" ");
+  int space2 = weights.indexOf(" ", space1 + 1);
+
+  p_w = weights.substring(0, space1).toFloat();
+  i_w = weights.substring(space1 + 1, space2).toFloat();
+  d_w = weights.substring(space2 + 1).toFloat();
+
   timer = millis();
   timer2 = millis();
 }
@@ -271,15 +280,22 @@ void loop() {
 
     timer2 = millis();
     last_error = error;
+    float c = p + d + i;
 
     Serial.print(p);
     Serial.print(" ");
     Serial.print(d);
     Serial.print(" ");
-    Serial.println(i);
-    
-    float c = p + d + i;
-    r.curve(150, c);
+    Serial.print(i);
+    Serial.print(" ");
+    Serial.println(c);
+
+    if (count < 50) {
+      count++;
+    }
+    else {
+      r.curve(150, c);
+    }
   }
   else {
     r.brake();
@@ -288,6 +304,38 @@ void loop() {
   while (millis() - timer < 50);
   timer = millis();
   
+}
+
+String getWeights(){
+  WiFiClient client; //instantiate a client object
+  if (client.connect("iesc-s1.mit.edu", 80)) { //try to connect to numbersapi.com host
+    // This will send the request to the server
+    // If connected, fire off HTTP GET:
+    client.println("GET /608dev/sandbox/pwang21/breakfastbotweights.py HTTP/1.1"); 
+    client.println("Host: iesc-s1.mit.edu");
+    client.print("\r\n");
+    unsigned long count = millis();
+    while (client.connected()) { //while we remain connected read out data coming back
+      String line = client.readStringUntil('\n');
+      //Serial.println(line);
+      if (line == "\r") { //found a blank line!
+        //headers have been received! (indicated by blank line)
+        break;
+      }
+      if (millis()-count>6000) break;
+    }
+    count = millis();
+    String op; //create empty String object
+    while (client.available()) { //read out remaining text (body of response)
+      op+=(char)client.read();
+    }
+    return op;
+    client.stop();
+  }else{
+    Serial.println("connection failed");
+    Serial.println("wait 0.5 sec...");
+    client.stop();
+  }
 }
    
 
