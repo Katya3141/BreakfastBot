@@ -273,7 +273,7 @@ void loop() {
 
   float error = r1Dist - 30;
     
-  if (r1Dist < 200 && abs(error - last_error) < 35) {
+  if (r1Dist < 200) {
     p = p_w * error;
     d = d_w * (error - last_error) / (millis() - timer2);
     i += i_w * error * (millis() - timer2);
@@ -281,7 +281,13 @@ void loop() {
     timer2 = millis();
     last_error = error;
     float c = p + d + i;
+    if(c > 200)
+      c = 200;
+    if(c < -200)
+      c = -200;
+    Serial.println("dist " + String(r1Dist) + "    curve " + String(c));
 
+/*
     Serial.print(p);
     Serial.print(" ");
     Serial.print(d);
@@ -289,8 +295,9 @@ void loop() {
     Serial.print(i);
     Serial.print(" ");
     Serial.println(c);
+  */
 
-    if (count < 50) {
+    if (count < 20) {
       count++;
     }
     else {
