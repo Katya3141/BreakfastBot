@@ -26,7 +26,11 @@
 
 float r2Dist, r1Dist, fDist;
 
+const int d_c = 10;
+
 float p, i=0, d;
+float d_history[d_c] = {0};
+
 float p_w = 4;
 float i_w = 0.0001;
 float d_w = 1000;
@@ -278,24 +282,42 @@ void loop() {
     d = d_w * (error - last_error) / (millis() - timer2);
     i += i_w * error * (millis() - timer2);
 
+    int d_sum = 0;
+
+    for (int q = d_c - 1; q > 0; q--) {
+      d_history[q] = d_history[q-1];
+    }
+    d_history[0] = d;
+
+    float sum = 0;
+
+    for (int q = 0; q < d_c; q++) {
+      sum += d_history[q];
+    }
+
+    float d_avg = sum / d_c;
+
     timer2 = millis();
     last_error = error;
-    float c = p + d + i;
-    if(c > 200)
-      c = 200;
-    if(c < -200)
-      c = -200;
-    Serial.println("dist " + String(r1Dist) + "    curve " + String(c));
+    float c = p + d_avg + i;
+    if(c > 30)
+      c = 30;
+    else if(c < -30)
+      c = -30;
 
-/*
+ /*
     Serial.print(p);
     Serial.print(" ");
-    Serial.print(d);
+    Serial.print(d_avg);
     Serial.print(" ");
     Serial.print(i);
     Serial.print(" ");
     Serial.println(c);
   */
+
+    Serial.print(d_avg);
+    Serial.print(" ");
+    Serial.println(r1Dist);
 
     if (count < 20) {
       count++;
