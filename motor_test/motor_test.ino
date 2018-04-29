@@ -23,6 +23,10 @@
 #define TURNRIGHT 3
 #define TURNLEFT 4
 
+#define STARTUP 0
+#define DRIVE 1
+#define CHECKDOOR 2
+#define DOORWAY 3
 
 #include <WiFi.h>
 
@@ -44,9 +48,11 @@ float last_error = 0;
 int count = 0;
 
 int state = 0;
+int d_state = STARTUP;
 unsigned long door_timer;
 unsigned long timer;
 unsigned long timer2;
+unsigned long person_timer;
 
 float getDist(int trig, int echo) {
   float duration, distance;
@@ -218,6 +224,7 @@ void setup() {
   timer = millis();
   timer2 = millis();
   door_timer = millis();
+  person_timer = millis();
 }
 
 String getInstruction(){
@@ -287,84 +294,118 @@ void loop() {
 
   
   r1Dist = getDist(r1Trig,r1Echo);
-
   float error = r1Dist - 40;
-    
-  if (r1Dist < 200) {
-    
-    p = p_w * error;
-    d = d_w * (error - last_error) / (millis() - timer2);
-    i += i_w * error * (millis() - timer2);
+  p = p_w * error;
+  d = d_w * (error - last_error) / (millis() - timer2);
+  i += i_w * error * (millis() - timer2);
+  float d_avg;
+  float c;
 
-
-    // shift entries in d_history    
-    int d_sum = 0;
-
-    for (int q = d_c - 1; q > 0; q--) {
-      d_history[q] = d_history[q-1];
-    }
-    d_history[0] = d;
-
-
-    // compute d_avg
-    float sum = 0;
-
-    for (int q = 0; q < d_c; q++) {
-      sum += d_history[q];
-    }
-
-    float d_avg = sum / d_c;
-
-    // shift entries in d_avg_history
-    for (int q = 4; q > 0; q--) {
-      d_avg_history[q] = d_avg_history[q-1];
-    }
-    d_avg_history[0] = d_avg;
-
-    // check for doorway
-    if (millis() - door_timer > 5000) {
-      for (int q = 4; q > 0; q--) {
-        if (abs(d_avg_history[q] - d_avg_history[0]) > 50) {
-          door_timer = millis();
-          digitalWrite(led, HIGH);
-          delay(100);
-          digitalWrite(led, LOW);
-          break;
-        }
+  switch(d_state) {
+    case STARTUP:
+      if (count < 20) {
+        count++;
       }
-    }
-    
-
-    timer2 = millis();
-    last_error = error;
-    float c = p + d_avg + i;
-    if(c > max_curve)
-      c = max_curve;
-    else if(c < -1 * max_curve)
-      c = -1 * max_curve;
-
-
-    if (count < 20) {
-      count++;
-    }
-    else {
+      else {
+        d_state = DRIVE;
+      }
+      break;
+    case DRIVE:
+      d_avg = updateDHistory();
+      
+      c = p + d_avg + i;
+      if(c > max_curve)
+        c = max_curve;
+      else if(c < -1 * max_curve)
+        c = -1 * max_curve;
+        
       r.curve(150, c);
       
       Serial.print(d_avg);
       Serial.println(" ");
 
-      /*
-      Serial.println(c); 
-      */
-    }
+      if (d_avg_history[0]-d_avg_history[1] < -50) {
+        person_timer = millis();
+      }
+      else if (d_avg_history[0]-d_avg_history[1] > 50 && millis() - person_timer > 1000) {
+        r.brake();
+        d_state = CHECKDOOR;
+      }
+      break;
+    case CHECKDOOR:
+      updateDHistory();
+
+      if(d_avg_history[0] < 0) {
+        d_state = DRIVE;
+      }
+      else if(millis() - door_timer > 5000) {
+        bool door = true;
+        for(int i = 0; i < 3; i++) {
+          if(d_avg_history[i] - d_avg_history[4] < 50) {
+            door = false;
+          }
+        }
+        if(door) {
+          d_state = DOORWAY;
+          door_timer = millis();
+        }
+      }
+      break;
+    case DOORWAY:
+      if(millis() - door_timer < 2000) {
+        digitalWrite(led, HIGH);
+        r.fwd(150);
+      }
+      else {
+        digitalWrite(led, LOW);
+        d_state = DRIVE;
+      }
+      break;
   }
-  else {
-    r.brake();
-  }
+
+    timer2 = millis();
+    last_error = error;
 
   while (millis() - timer < 50);
   timer = millis();
   
+}
+
+float updateDHistory() {
+  // shift entries in d_history to filter d 
+  float d_avg;
+    
+  if(d < 200) {
+    for (int q = d_c - 1; q > 0; q--) {
+      d_history[q] = d_history[q-1];
+    }
+    d_history[0] = d;
+  
+    // compute d_avg to check for doorway
+    float sum = 0;
+  
+    for (int q = 0; q < d_c; q++) {
+      sum += d_history[q];
+    }
+  
+    d_avg = sum / d_c;
+  
+    // shift entries in d_avg_history
+    for (int q = 4; q > 0; q--) {
+      d_avg_history[q] = d_avg_history[q-1];
+    }
+    d_avg_history[0] = d_avg;
+  }
+  else {
+    // shift entries in d_avg_history
+    for (int q = 4; q > 0; q--) {
+      d_avg_history[q] = d_avg_history[q-1];
+    }
+    d_avg = 200;
+    d_avg_history[0] = d_avg;
+  }
+
+  return d_avg;
 }
 
 String getWeights(){
