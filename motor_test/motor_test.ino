@@ -15,6 +15,8 @@
 #define fTrig 5
 #define fEcho 15
 
+#define led 18
+
 #define BRAKE 0
 #define FORWARD 1
 #define BACKWARDS 2
@@ -30,14 +32,19 @@ const int d_c = 10;
 
 float p, i=0, d;
 float d_history[d_c] = {0};
+float d_avg_history[5] = {0};
 
 float p_w = 4;
 float i_w = 0.0001;
 float d_w = 1000;
+float max_delta = 20;
+float max_curve = 30;
+
 float last_error = 0;
 int count = 0;
 
 int state = 0;
+unsigned long door_timer;
 unsigned long timer;
 unsigned long timer2;
 
@@ -177,6 +184,7 @@ void setup() {
   pinMode(r1Echo, INPUT);
   pinMode(fTrig, OUTPUT);
   pinMode(fEcho, INPUT);
+  pinMode(led, OUTPUT);
 
   delay(100); //wait a bit (100 ms)
   WiFi.begin("MIT"); //attempt to connect to wifi
@@ -198,13 +206,18 @@ void setup() {
   String weights = getWeights();
   int space1 = weights.indexOf(" ");
   int space2 = weights.indexOf(" ", space1 + 1);
+  int space3 = weights.indexOf(" ", space2 + 1);
+  int space4 = weights.indexOf(" ", space3 + 1);
 
   p_w = weights.substring(0, space1).toFloat();
   i_w = weights.substring(space1 + 1, space2).toFloat();
-  d_w = weights.substring(space2 + 1).toFloat();
+  d_w = weights.substring(space2 + 1, space3).toFloat();
+  max_delta = weights.substring(space3 + 1, space4).toFloat();
+  max_curve = weights.substring(space4 + 1).toFloat();
 
   timer = millis();
   timer2 = millis();
+  door_timer = millis();
 }
 
 String getInstruction(){
@@ -275,13 +288,16 @@ void loop() {
   
   r1Dist = getDist(r1Trig,r1Echo);
 
-  float error = r1Dist - 30;
+  float error = r1Dist - 40;
     
   if (r1Dist < 200) {
+    
     p = p_w * error;
     d = d_w * (error - last_error) / (millis() - timer2);
     i += i_w * error * (millis() - timer2);
 
+
+    // shift entries in d_history    
     int d_sum = 0;
 
     for (int q = d_c - 1; q > 0; q--) {
@@ -289,6 +305,8 @@ void loop() {
     }
     d_history[0] = d;
 
+
+    // compute d_avg
     float sum = 0;
 
     for (int q = 0; q < d_c; q++) {
@@ -297,33 +315,47 @@ void loop() {
 
     float d_avg = sum / d_c;
 
+    // shift entries in d_avg_history
+    for (int q = 4; q > 0; q--) {
+      d_avg_history[q] = d_avg_history[q-1];
+    }
+    d_avg_history[0] = d_avg;
+
+    // check for doorway
+    if (millis() - door_timer > 5000) {
+      for (int q = 4; q > 0; q--) {
+        if (abs(d_avg_history[q] - d_avg_history[0]) > 50) {
+          door_timer = millis();
+          digitalWrite(led, HIGH);
+          delay(100);
+          digitalWrite(led, LOW);
+          break;
+        }
+      }
+    }
+    
+
     timer2 = millis();
     last_error = error;
     float c = p + d_avg + i;
-    if(c > 30)
-      c = 30;
-    else if(c < -30)
-      c = -30;
+    if(c > max_curve)
+      c = max_curve;
+    else if(c < -1 * max_curve)
+      c = -1 * max_curve;
 
- /*
-    Serial.print(p);
-    Serial.print(" ");
-    Serial.print(d_avg);
-    Serial.print(" ");
-    Serial.print(i);
-    Serial.print(" ");
-    Serial.println(c);
-  */
-
-    Serial.print(d_avg);
-    Serial.print(" ");
-    Serial.println(r1Dist);
 
     if (count < 20) {
       count++;
     }
     else {
       r.curve(150, c);
+      
+      Serial.print(d_avg);
+      Serial.println(" ");
+
+      /*
+      Serial.println(c); 
+      */
     }
   }
   else {
