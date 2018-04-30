@@ -335,9 +335,11 @@ void loop() {
   float error;
 
   if (side) {
+    Serial.println("right");
     error = rDist - 40;
   }
   else {
+    Serial.println("left");
     error = 40 - lDist;
   }
 
@@ -403,8 +405,8 @@ void loop() {
       c = p + d_avg + i;
       if(c > max_curve)
         c = max_curve;
-      else if(c < -1 * max_curve)
-        c = -1 * max_curve;
+      else if(c < -1 * 50)
+        c = -1 * 50;
 
       Serial.println("c: " + String(c));
         
