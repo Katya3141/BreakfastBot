@@ -8,10 +8,10 @@
 #define SDA 21
 #define SCL 22
 
-#define r2Trig 16
-#define r2Echo 17
-#define r1Trig 14
-#define r1Echo 12
+#define lTrig 16
+#define lEcho 17
+#define rTrig 14
+#define rEcho 12
 #define fTrig 5
 #define fEcho 15
 
@@ -23,14 +23,19 @@
 #define TURNRIGHT 3
 #define TURNLEFT 4
 
-#define STARTUP 0
-#define DRIVE 1
-#define CHECKDOOR 2
-#define DOORWAY 3
+#define WAIT 0
+#define PARSE 1
+#define TURN 2
+#define STARTUP 3
+#define DRIVE 4
+#define CHECKDOOR 5
+#define DOORWAY 6
+#define ADJUST 7
 
 #include <WiFi.h>
 
-float r2Dist, r1Dist, fDist;
+float lDist, rDist, fDist;
+float dist;
 
 const int d_c = 10;
 const int AVG_HISTORY_LEN = 10;
@@ -51,11 +56,19 @@ int count = 0;
 int check_count = 0;
 
 int state = 0;
-int d_state = STARTUP;
+int d_state = WAIT;
 unsigned long door_timer;
 unsigned long timer;
 unsigned long timer2;
 unsigned long person_timer;
+
+int door_count = 0;
+int max_doors = 0;
+bool side = true;
+bool turn_dir;
+String cur_instr;
+int instr_n;  
+bool go = false;
 
 float getDist(int trig, int echo) {
   float duration, distance;
@@ -178,6 +191,10 @@ class Robot {
       right.back(spd);
     }
   }
+
+  void turn(int spd, int dgrees) {
+    
+  }
 };
 
 Motor A(AIN1, AIN2, PWMA, 0, STBYAB);
@@ -188,10 +205,10 @@ void setup() {
 
   Serial.begin(115200);
 
-  pinMode(r2Trig, OUTPUT);
-  pinMode(r2Echo, INPUT);
-  pinMode(r1Trig, OUTPUT);
-  pinMode(r1Echo, INPUT);
+  pinMode(lTrig, OUTPUT);
+  pinMode(lEcho, INPUT);
+  pinMode(rTrig, OUTPUT);
+  pinMode(rEcho, INPUT);
   pinMode(fTrig, OUTPUT);
   pinMode(fEcho, INPUT);
   pinMode(led, OUTPUT);
@@ -297,15 +314,62 @@ void loop() {
   */
 
   
-  r1Dist = getDist(r1Trig,r1Echo);
-  float error = r1Dist - 40;
+  rDist = getDist(rTrig,rEcho);
+  lDist = getDist(lTrig,lEcho);
+  fDist = getDist(fTrig,fEcho);
+
+  if (side) {
+    dist = rDist;
+  }
+  else {
+    dist = lDist;
+  }
+  
+  float error = dist - 40;
   p = p_w * error;
   d = d_w * (error - last_error) / (millis() - timer2);
   i += i_w * error * (millis() - timer2);
   float d_avg;
   float c;
 
+  String instr[] = {"2l", "r", "1l", "l", "1r", "r"};
+  go = true;
+
   switch(d_state) {
+    case WAIT:
+      if (go) {
+        state = PARSE;
+        instr_n = 0;
+      }
+      break;
+    case PARSE:
+      if (instr_n == *(&instr + 1) - instr) {
+        go = false;
+        state = WAIT;
+      }
+      else {
+        cur_instr = instr[instr_n];
+        instr_n += 1;
+        if (cur_instr.charAt(0) >= 49 && cur_instr.charAt(0) <= 57) {
+          max_doors = (int) (cur_instr.charAt(0)) - 48;
+          side = (cur_instr.charAt(1) == 'r');
+          state = STARTUP;
+        }
+        else {
+          turn_dir = (cur_instr.charAt(0) == 'r');
+          state = TURN;
+        }
+      }
+      break;
+    case TURN:
+      if (turn_dir) {
+        r.turn(200, 90);
+      }
+      else {
+        r.turn(200, -90);
+      }
+      state = PARSE;
+      break;
     case STARTUP:
       if (count < 20) {
         count++;
@@ -363,17 +427,29 @@ void loop() {
     case DOORWAY:
       if(millis() - door_timer < 2000) {
         digitalWrite(led, HIGH);
+        door_count += 1;
         r.fwd(150);
       }
       else {
         digitalWrite(led, LOW);
-        d_state = DRIVE;
+        if (door_count = max_doors) {
+          d_state = ADJUST;
+        }
+        else {
+          d_state = DRIVE;          
+        }
       }
+      break;
+    case ADJUST:
+      r.fwd(150);
+      delay(500);
+      r.brake();
+      state = PARSE;
       break;
   }
 
-    timer2 = millis();
-    last_error = error;
+  timer2 = millis();
+  last_error = error;
 
   while (millis() - timer < 50);
   timer = millis();
