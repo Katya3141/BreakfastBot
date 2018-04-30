@@ -33,10 +33,12 @@
 float r2Dist, r1Dist, fDist;
 
 const int d_c = 10;
+const int AVG_HISTORY_LEN = 10;
+const int d_threshhold = 50;
 
 float p, i=0, d;
 float d_history[d_c] = {0};
-float d_avg_history[5] = {0};
+float d_avg_history[AVG_HISTORY_LEN] = {0};
 
 float p_w = 4;
 float i_w = 0.0001;
@@ -46,6 +48,7 @@ float max_curve = 30;
 
 float last_error = 0;
 int count = 0;
+int check_count = 0;
 
 int state = 0;
 int d_state = STARTUP;
@@ -121,6 +124,7 @@ class Motor {
 
 class Robot {
   Motor left, right;
+  const float offset = 15;
 
   public:
   Robot(Motor l, Motor r) {
@@ -129,12 +133,12 @@ class Robot {
   }
 
   void fwd(int spd) {
-    left.fwd(spd);
+    left.fwd(spd - offset);
     right.fwd(spd);
   }
 
   void back(int spd) {
-    left.back(spd);
+    left.back(spd - offset);
     right.back(spd);
   }
 
@@ -322,33 +326,38 @@ void loop() {
       r.curve(150, c);
       
       Serial.print(d_avg);
-      Serial.println(" ");
+      Serial.print(" ");
+      Serial.println(error);
 
       if (d_avg_history[0]-d_avg_history[1] < -50) {
         person_timer = millis();
       }
-      else if (d_avg_history[0]-d_avg_history[1] > 50 && millis() - person_timer > 1000) {
+      else if (d_avg_history[0]-d_avg_history[1] > d_threshhold && millis() - person_timer > 2000) {
         r.brake();
         d_state = CHECKDOOR;
+        check_count = 0;
       }
       break;
     case CHECKDOOR:
       updateDHistory();
 
-      if(d_avg_history[0] < 0) {
-        d_state = DRIVE;
-      }
-      else if(millis() - door_timer > 5000) {
-        bool door = true;
-        for(int i = 0; i < 3; i++) {
-          if(d_avg_history[i] - d_avg_history[4] < 50) {
-            door = false;
+      if(millis() - door_timer > 5000) {
+        int door_measurements = 0;
+        for(int i = 0; i < AVG_HISTORY_LEN - 1; i++) {
+          if(d_avg_history[i] - d_avg_history[AVG_HISTORY_LEN - 1] > d_threshhold) {
+            door_measurements++;
           }
         }
-        if(door) {
+        
+        if(door_measurements >= 3) {
           d_state = DOORWAY;
           door_timer = millis();
         }
+      }
+
+      check_count++;
+      if(check_count > 20) {
+        d_state = DRIVE;
       }
       break;
     case DOORWAY:
@@ -391,14 +400,14 @@ float updateDHistory() {
     d_avg = sum / d_c;
   
     // shift entries in d_avg_history
-    for (int q = 4; q > 0; q--) {
+    for (int q = AVG_HISTORY_LEN - 1; q > 0; q--) {
       d_avg_history[q] = d_avg_history[q-1];
     }
     d_avg_history[0] = d_avg;
   }
   else {
     // shift entries in d_avg_history
-    for (int q = 4; q > 0; q--) {
+    for (int q = AVG_HISTORY_LEN - 1; q > 0; q--) {
       d_avg_history[q] = d_avg_history[q-1];
     }
     d_avg = 200;
