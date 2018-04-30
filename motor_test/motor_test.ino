@@ -33,6 +33,7 @@
 #define ADJUST 7
 
 #include <WiFi.h>
+#include <mpu9255_esp32.h>
 
 float lDist, rDist, fDist;
 float dist;
@@ -86,7 +87,6 @@ float getDist(int trig, int echo) {
 }
 
 class Motor {
-
   int in1, in2, pwm, channel, stdby;
   int freq = 5000;
   int resolution = 8;
@@ -138,11 +138,30 @@ class Motor {
 class Robot {
   Motor left, right;
   const float offset = 15;
+  
+  const float g_const = -0.00077;
+  const float epsilon = 10;
+  MPU9255 imu; //imu object called, appropriately, imu
 
   public:
   Robot(Motor l, Motor r) {
+
     left = l;
     right = r;
+
+/*
+    //setup imu
+    if (imu.readByte(MPU9255_ADDRESS, WHO_AM_I_MPU9255) == 0x73){
+      imu.initMPU9255();
+    }else{
+      while(1) Serial.println("NOT FOUND"); // Loop forever if communication doesn't happen
+    }
+    imu.getAres(); //call this so the IMU internally knows its range/resolution
+    delay(50);
+    imu.calibrateMPU9255(imu.gyroBias, imu.accelBias);
+    delay(50);
+*/
+
   }
 
   void fwd(int spd) {
@@ -192,8 +211,20 @@ class Robot {
     }
   }
 
-  void turn(int spd, int dgrees) {
-    
+  void turn(int dgrees, int spd) {
+    /*
+    int angle = 0;
+    while(abs(angle-dgrees)>epsilon) {
+      if(dgrees > 0)
+        turnRight(spd);
+      else
+        turnLeft(spd);
+      imu.readGyroData(imu.gyroCount);
+      if(imu.gyroCount[2]*g_const > 0.1 || imu.gyroCount[2]*g_const < -0.1)
+        angle += imu.gyroCount[2]*g_const;
+    }
+    brake();
+    */
   }
 };
 
@@ -204,6 +235,7 @@ Robot r(A, B);
 void setup() {
 
   Serial.begin(115200);
+  Serial.println("test");
 
   pinMode(lTrig, OUTPUT);
   pinMode(lEcho, INPUT);
