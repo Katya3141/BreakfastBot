@@ -335,15 +335,16 @@ void loop() {
   float error;
 
   if (side) {
-    Serial.println("right");
+    Serial.print("right: ");
     error = rDist - 40;
   }
   else {
-    Serial.println("left");
-    error = 40 - lDist;
+    Serial.print("left: ");
+    error = 10 - lDist;
   }
 
-  Serial.println(error);
+  Serial.print(error);
+  Serial.println("state: " + String(d_state));
   
   p = p_w * error;
   d = d_w * (error - last_error) / (millis() - timer2);
@@ -405,10 +406,8 @@ void loop() {
       c = p + d_avg + i;
       if(c > max_curve)
         c = max_curve;
-      else if(c < -1 * 50)
-        c = -1 * 50;
-
-      Serial.println("c: " + String(c));
+      else if(c < -1 * max_curve)
+        c = -1 * max_curve;
         
       r.curve(150, c);
 
@@ -418,10 +417,11 @@ void loop() {
       Serial.println(error);
       */
 
-      if (d_avg_history[0]-d_avg_history[1] < -50) {
+      if ((d_avg_history[0]-d_avg_history[1] < -50 && side) || (d_avg_history[0]-d_avg_history[1] > 50 && !side)) {
+        Serial.print("PERSON");
         person_timer = millis();
       }
-      else if (d_avg_history[0]-d_avg_history[1] > d_threshhold && millis() - person_timer > 2000) {
+      else if (((d_avg_history[0]-d_avg_history[1] > d_threshhold && side) || (d_avg_history[0]-d_avg_history[1] < -1* d_threshhold && !side)) && millis() - person_timer > 2000) {
         r.brake();
         d_state = CHECKDOOR;
         check_count = 0;
@@ -433,19 +433,26 @@ void loop() {
       if(millis() - door_timer > 5000) {
         int door_measurements = 0;
         for(int i = 0; i < AVG_HISTORY_LEN - 1; i++) {
-          if(d_avg_history[i] - d_avg_history[AVG_HISTORY_LEN - 1] > d_threshhold) {
-            door_measurements++;
+          if (side) {
+            if(d_avg_history[i] - d_avg_history[AVG_HISTORY_LEN - 1] > d_threshhold) {
+              door_measurements += 1;
+            }
+          }
+          else {
+            if(d_avg_history[i] - d_avg_history[AVG_HISTORY_LEN - 1] < -1 * d_threshhold) {
+              door_measurements += 1;
+            }
           }
         }
         
-        if(door_measurements >= 3) {
+        if(door_measurements >= 4) {
           d_state = DOORWAY;
           door_timer = millis();
         }
       }
 
       check_count++;
-      if(check_count > 20) {
+      if(check_count > 10) {
         d_state = DRIVE;
       }
       break;
@@ -473,8 +480,6 @@ void loop() {
       break;
   }
 
-  Serial.println(d_state);
-
   timer2 = millis();
   last_error = error;
 
@@ -487,7 +492,7 @@ float updateDHistory() {
   // shift entries in d_history to filter d 
   float d_avg;
     
-  if(d < 200) {
+  if((d < 200 && side) || (d > -200 && !side)) {
     for (int q = d_c - 1; q > 0; q--) {
       d_history[q] = d_history[q-1];
     }
@@ -513,7 +518,12 @@ float updateDHistory() {
     for (int q = AVG_HISTORY_LEN - 1; q > 0; q--) {
       d_avg_history[q] = d_avg_history[q-1];
     }
-    d_avg = 200;
+    if (side) {
+      d_avg = 200;
+    }
+    else {
+      d_avg = -200;
+    }
     d_avg_history[0] = d_avg;
   }
 
@@ -529,8 +539,9 @@ void turn(int dgrees, int spd) {
   while(abs(angle-dgrees)>epsilon) {
     if(dgrees > 0)
       r.turnRight(spd);
-    else
+    else {
       r.turnLeft(spd);
+    }
     imu.readGyroData(imu.gyroCount);
     if(imu.gyroCount[2]*g_const > 0.1 || imu.gyroCount[2]*g_const < -0.1)
       angle += imu.gyroCount[2]*g_const;
