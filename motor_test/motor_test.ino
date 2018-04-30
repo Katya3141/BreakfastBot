@@ -35,6 +35,8 @@
 #include <WiFi.h>
 #include <mpu9255_esp32.h>
 
+MPU9255 imu; //imu object called, appropriately, imu
+
 float lDist, rDist, fDist;
 float dist;
 
@@ -138,29 +140,12 @@ class Motor {
 class Robot {
   Motor left, right;
   const float offset = 15;
-  
-  const float g_const = -0.00077;
-  const float epsilon = 10;
-  MPU9255 imu; //imu object called, appropriately, imu
 
   public:
   Robot(Motor l, Motor r) {
 
     left = l;
     right = r;
-
-/*
-    //setup imu
-    if (imu.readByte(MPU9255_ADDRESS, WHO_AM_I_MPU9255) == 0x73){
-      imu.initMPU9255();
-    }else{
-      while(1) Serial.println("NOT FOUND"); // Loop forever if communication doesn't happen
-    }
-    imu.getAres(); //call this so the IMU internally knows its range/resolution
-    delay(50);
-    imu.calibrateMPU9255(imu.gyroBias, imu.accelBias);
-    delay(50);
-*/
 
   }
 
@@ -210,22 +195,6 @@ class Robot {
       right.back(spd);
     }
   }
-
-  void turn(int dgrees, int spd) {
-    /*
-    int angle = 0;
-    while(abs(angle-dgrees)>epsilon) {
-      if(dgrees > 0)
-        turnRight(spd);
-      else
-        turnLeft(spd);
-      imu.readGyroData(imu.gyroCount);
-      if(imu.gyroCount[2]*g_const > 0.1 || imu.gyroCount[2]*g_const < -0.1)
-        angle += imu.gyroCount[2]*g_const;
-    }
-    brake();
-    */
-  }
 };
 
 Motor A(AIN1, AIN2, PWMA, 0, STBYAB);
@@ -235,7 +204,6 @@ Robot r(A, B);
 void setup() {
 
   Serial.begin(115200);
-  Serial.println("test");
 
   pinMode(lTrig, OUTPUT);
   pinMode(lEcho, INPUT);
@@ -274,10 +242,25 @@ void setup() {
   max_delta = weights.substring(space3 + 1, space4).toFloat();
   max_curve = weights.substring(space4 + 1).toFloat();
 
+  setup_imu();
+
   timer = millis();
   timer2 = millis();
   door_timer = millis();
   person_timer = millis();
+}
+
+void setup_imu() {
+  //setup imu
+  if (imu.readByte(MPU9255_ADDRESS, WHO_AM_I_MPU9255) == 0x73){
+    imu.initMPU9255();
+  }else{
+    while(1) Serial.println("NOT FOUND"); // Loop forever if communication doesn't happen
+  }
+  imu.getAres(); //call this so the IMU internally knows its range/resolution
+  delay(50);
+  imu.calibrateMPU9255(imu.gyroBias, imu.accelBias);
+  delay(50);
 }
 
 String getInstruction(){
@@ -345,19 +328,21 @@ void loop() {
 
   */
 
-  
   rDist = getDist(rTrig,rEcho);
   lDist = getDist(lTrig,lEcho);
   fDist = getDist(fTrig,fEcho);
 
+  float error;
+
   if (side) {
-    dist = rDist;
+    error = rDist - 40;
   }
   else {
-    dist = lDist;
+    error = 40 - lDist;
   }
+
+  Serial.println(error);
   
-  float error = dist - 40;
   p = p_w * error;
   d = d_w * (error - last_error) / (millis() - timer2);
   i += i_w * error * (millis() - timer2);
@@ -370,43 +355,45 @@ void loop() {
   switch(d_state) {
     case WAIT:
       if (go) {
-        state = PARSE;
+        d_state = PARSE;
         instr_n = 0;
       }
       break;
     case PARSE:
       if (instr_n == *(&instr + 1) - instr) {
         go = false;
-        state = WAIT;
+        d_state = WAIT;
       }
       else {
         cur_instr = instr[instr_n];
         instr_n += 1;
-        if (cur_instr.charAt(0) >= 49 && cur_instr.charAt(0) <= 57) {
+        if ((int) cur_instr.charAt(0) >= 49 && (int) cur_instr.charAt(0) <= 57) {
           max_doors = (int) (cur_instr.charAt(0)) - 48;
           side = (cur_instr.charAt(1) == 'r');
-          state = STARTUP;
+          d_state = STARTUP;
         }
         else {
           turn_dir = (cur_instr.charAt(0) == 'r');
-          state = TURN;
+          d_state = TURN;
         }
       }
       break;
     case TURN:
       if (turn_dir) {
-        r.turn(200, 90);
+        turn(200, 90);
       }
       else {
-        r.turn(200, -90);
+        turn(200, -90);
       }
-      state = PARSE;
+      d_state = PARSE;
       break;
     case STARTUP:
       if (count < 20) {
         count++;
       }
       else {
+        count = 0;
+        
         d_state = DRIVE;
       }
       break;
@@ -418,12 +405,16 @@ void loop() {
         c = max_curve;
       else if(c < -1 * max_curve)
         c = -1 * max_curve;
+
+      Serial.println("c: " + String(c));
         
       r.curve(150, c);
-      
+
+      /*
       Serial.print(d_avg);
       Serial.print(" ");
       Serial.println(error);
+      */
 
       if (d_avg_history[0]-d_avg_history[1] < -50) {
         person_timer = millis();
@@ -476,9 +467,11 @@ void loop() {
       r.fwd(150);
       delay(500);
       r.brake();
-      state = PARSE;
+      d_state = PARSE;
       break;
   }
+
+  Serial.println(d_state);
 
   timer2 = millis();
   last_error = error;
@@ -523,6 +516,24 @@ float updateDHistory() {
   }
 
   return d_avg;
+}
+
+void turn(int dgrees, int spd) {
+
+  const float g_const = -0.00077;
+  const float epsilon = 10;
+
+  int angle = 0;
+  while(abs(angle-dgrees)>epsilon) {
+    if(dgrees > 0)
+      r.turnRight(spd);
+    else
+      r.turnLeft(spd);
+    imu.readGyroData(imu.gyroCount);
+    if(imu.gyroCount[2]*g_const > 0.1 || imu.gyroCount[2]*g_const < -0.1)
+      angle += imu.gyroCount[2]*g_const;
+  }
+  r.brake();
 }
 
 String getWeights(){
