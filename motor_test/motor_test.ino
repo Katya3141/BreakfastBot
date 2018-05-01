@@ -328,23 +328,15 @@ void loop() {
 
   */
 
-  rDist = getDist(rTrig,rEcho);
-  lDist = getDist(lTrig,lEcho);
-  fDist = getDist(fTrig,fEcho);
 
   float error;
 
   if (side) {
-    Serial.print("right: ");
-    error = rDist - 40;
+    error = getDist(rTrig,rEcho) - 40;
   }
   else {
-    Serial.print("left: ");
-    error = 10 - lDist;
+    error = 10 - getDist(lTrig,lEcho);
   }
-
-  Serial.print(error);
-  Serial.println("state: " + String(d_state));
   
   p = p_w * error;
   d = d_w * (error - last_error) / (millis() - timer2);
@@ -374,6 +366,7 @@ void loop() {
           max_doors = (int) (cur_instr.charAt(0)) - 48;
           side = (cur_instr.charAt(1) == 'r');
           d_state = STARTUP;
+          count = 0;
         }
         else {
           turn_dir = (cur_instr.charAt(0) == 'r');
@@ -391,12 +384,12 @@ void loop() {
       d_state = PARSE;
       break;
     case STARTUP:
+      d_avg = updateDHistory();
+      
       if (count < 20) {
         count++;
       }
       else {
-        count = 0;
-        
         d_state = DRIVE;
       }
       break;
@@ -406,16 +399,10 @@ void loop() {
       c = p + d_avg + i;
       if(c > max_curve)
         c = max_curve;
-      else if(c < -1 * max_curve)
-        c = -1 * max_curve;
+      else if(c < -1 * 50)
+        c = -1 * 50;
         
       r.curve(150, c);
-
-      /*
-      Serial.print(d_avg);
-      Serial.print(" ");
-      Serial.println(error);
-      */
 
       if ((d_avg_history[0]-d_avg_history[1] < -50 && side) || (d_avg_history[0]-d_avg_history[1] > 50 && !side)) {
         Serial.print("PERSON");
@@ -428,7 +415,7 @@ void loop() {
       }
       break;
     case CHECKDOOR:
-      updateDHistory();
+      d_avg = updateDHistory();
 
       if(millis() - door_timer > 5000) {
         int door_measurements = 0;
@@ -445,7 +432,7 @@ void loop() {
           }
         }
         
-        if(door_measurements >= 4) {
+        if(door_measurements >= 3) {
           d_state = DOORWAY;
           door_timer = millis();
         }
@@ -480,8 +467,20 @@ void loop() {
       break;
   }
 
+
+  Serial.print(d_state);
+  Serial.print(" ");
+  Serial.print(d_avg);
+  Serial.println(" ");
+
+
   timer2 = millis();
-  last_error = error;
+  if((d > -50 && d < 50) || count < 10) {
+    last_error = error;
+  }
+  else {
+    Serial.println("d: " + String(d));
+  }
 
   while (millis() - timer < 50);
   timer = millis();
@@ -536,6 +535,7 @@ void turn(int dgrees, int spd) {
   const float epsilon = 10;
 
   int angle = 0;
+  Serial.println("angle: " + angle);
   while(abs(angle-dgrees)>epsilon) {
     if(dgrees > 0)
       r.turnRight(spd);
@@ -545,6 +545,7 @@ void turn(int dgrees, int spd) {
     imu.readGyroData(imu.gyroCount);
     if(imu.gyroCount[2]*g_const > 0.1 || imu.gyroCount[2]*g_const < -0.1)
       angle += imu.gyroCount[2]*g_const;
+    Serial.println("angle: " + angle);
   }
   r.brake();
 }
