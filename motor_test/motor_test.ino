@@ -434,6 +434,7 @@ void loop() {
         
         if(door_measurements >= 3) {
           d_state = DOORWAY;
+          door_count += 1;
           door_timer = millis();
         }
       }
@@ -444,20 +445,19 @@ void loop() {
       }
       break;
     case DOORWAY:
-      if(millis() - door_timer < 2000) {
-        digitalWrite(led, HIGH);
-        door_count += 1;
-        r.fwd(150);
+      if (door_count = max_doors) {
+        d_state = ADJUST;
       }
       else {
-        digitalWrite(led, LOW);
-        if (door_count = max_doors) {
-          d_state = ADJUST;
+        if(millis() - door_timer < 2000) {
+          digitalWrite(led, HIGH);
+          r.fwd(150);
         }
         else {
-          d_state = DRIVE;          
+          digitalWrite(led, LOW);
+            d_state = DRIVE;          
+          }
         }
-      }
       break;
     case ADJUST:
       r.fwd(150);
