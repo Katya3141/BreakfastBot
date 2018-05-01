@@ -344,7 +344,7 @@ void loop() {
   float d_avg;
   float c;
 
-  String instr[] = {"2l", "r", "1l", "l", "1r", "r"};
+  String instr[] = {"r", "2l", "r", "1l", "l", "1r", "r"};
   go = true;
 
   switch(d_state) {
@@ -376,10 +376,10 @@ void loop() {
       break;
     case TURN:
       if (turn_dir) {
-        turn(200, 90);
+        turn(90, 200);
       }
       else {
-        turn(200, -90);
+        turn(-90, 200);
       }
       d_state = PARSE;
       break;
@@ -538,7 +538,7 @@ void turn(int dgrees, int spd) {
   const float epsilon = 10;
 
   float angle = 0;
-  Serial.println("angle: " + angle);
+  Serial.println("angle: " + String(angle));
   while(abs(angle-dgrees)>epsilon) {
     if(dgrees > 0)
       r.turnRight(spd);
@@ -548,7 +548,8 @@ void turn(int dgrees, int spd) {
     imu.readGyroData(imu.gyroCount);
     if(imu.gyroCount[2]*g_const > 0.1 || imu.gyroCount[2]*g_const < -0.1)
       angle += imu.gyroCount[2]*g_const;
-    Serial.println("angle: " + angle);
+    Serial.println("angle: " + String(angle));
+    delay(100);
   }
   r.brake();
 }
