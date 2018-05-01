@@ -471,16 +471,19 @@ void loop() {
   Serial.print(d_state);
   Serial.print(" ");
   Serial.print(d_avg);
-  Serial.println(" ");
+  Serial.print(" ");
 
 
   timer2 = millis();
-  if((d > -50 && d < 50) || count < 10) {
+  if(d_state != CHECKDOOR) {
     last_error = error;
   }
   else {
-    Serial.println("d: " + String(d));
+    Serial.print(" d: " + String(d) + " ");
   }
+  Serial.print(error);
+  Serial.print(" ");
+  Serial.println(last_error);
 
   while (millis() - timer < 50);
   timer = millis();
@@ -534,7 +537,7 @@ void turn(int dgrees, int spd) {
   const float g_const = -0.00077;
   const float epsilon = 10;
 
-  int angle = 0;
+  float angle = 0;
   Serial.println("angle: " + angle);
   while(abs(angle-dgrees)>epsilon) {
     if(dgrees > 0)
