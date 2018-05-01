@@ -71,7 +71,7 @@ bool side = true;
 bool turn_dir;
 String cur_instr;
 int instr_n;  
-bool go = false;
+bool go = true;
 
 float getDist(int trig, int echo) {
   float duration, distance;
@@ -344,8 +344,7 @@ void loop() {
   float d_avg;
   float c;
 
-  String instr[] = {"r", "2l", "r", "1l", "l", "1r", "r"};
-  go = true;
+  String instr[] = {"1l", "1r", "r", "1l", "l", "2l", "l", "1r", "r", "3l", "l"};
 
   switch(d_state) {
     case WAIT:
@@ -355,6 +354,8 @@ void loop() {
       }
       break;
     case PARSE:
+      door_timer = 0;
+    
       if (instr_n == *(&instr + 1) - instr) {
         go = false;
         d_state = WAIT;
@@ -376,10 +377,10 @@ void loop() {
       break;
     case TURN:
       if (turn_dir) {
-        turn(90, 200);
+        turn(90, 150);
       }
       else {
-        turn(-90, 200);
+        turn(-90, 150);
       }
       d_state = PARSE;
       break;
@@ -445,8 +446,10 @@ void loop() {
       }
       break;
     case DOORWAY:
-      if (door_count = max_doors) {
+      if (door_count == max_doors) {
+        digitalWrite(led, HIGH);
         d_state = ADJUST;
+        door_count = 0;
       }
       else {
         if(millis() - door_timer < 2000) {
@@ -461,13 +464,15 @@ void loop() {
       break;
     case ADJUST:
       r.fwd(150);
-      delay(500);
+      delay(1100);
       r.brake();
       d_state = PARSE;
+      digitalWrite(led, LOW);
       break;
   }
 
-
+  Serial.print(side);
+  Serial.print(" ");
   Serial.print(d_state);
   Serial.print(" ");
   Serial.print(d_avg);
@@ -535,7 +540,7 @@ float updateDHistory() {
 void turn(int dgrees, int spd) {
 
   const float g_const = -0.00077;
-  const float epsilon = 10;
+  const float epsilon = 20;
 
   float angle = 0;
   Serial.println("angle: " + String(angle));
