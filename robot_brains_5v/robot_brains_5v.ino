@@ -25,9 +25,7 @@
 #define FINDWALL 6
 #define STARTUP 7
 #define DRIVE 8
-#define CHECKIN 9
-#define CHECKOUT 10
-#define ADJUST 11
+#define ADJUST 9
 
 #include <WiFi.h>
 #include <mpu9255_esp32.h>
@@ -128,7 +126,7 @@ class Motor {
 
 class Robot {
   Motor left, right;
-  const float offset = 15;
+  const float offset = 25;
 
   public:
   Robot(Motor l, Motor r) {
@@ -222,6 +220,8 @@ void setup() {
     ESP.restart(); // restart the ESP
   }
 
+  // connects to wifi and gets constants
+
   String weights = getWeights();
   int space1 = weights.indexOf(" ");
   int space2 = weights.indexOf(" ", space1 + 1);
@@ -236,8 +236,6 @@ void setup() {
 
   setup_imu();
 
-  side = -1;
-
   timer = millis();
   last_measure_time = millis();
 }
@@ -245,7 +243,8 @@ void setup() {
 void loop() {
 
   float error, c, p, d, i;
-  
+
+  // compute error from desired distance from wall
   if (side == 1) {
     error = getDist(rTrig,rEcho) - 40;
   }
@@ -253,13 +252,17 @@ void loop() {
     error = 30 - getDist(lTrig,lEcho);
   }
 
+  // compute elements of pid control
   p = p_w * error;
   d = d_w * (error - last_error[0]) / (millis() - last_measure_time);
   i += i_w * error * (millis() - last_measure_time);
+
+  // compute amount robot should curve by
   c = p + d + i;
 
   last_measure_time = millis();
 
+  // cap amount robot is allowed to curve by
   if(c > max_curve)
     c = max_curve;
   else if(c < -1 * max_curve)
@@ -267,18 +270,18 @@ void loop() {
 
   switch (state) {
     case LISTEN:
-      state = DISPENSE;
+      state = DISPENSE; // NOT IMPLEMENTED
       break;
     case DISPENSE:
-      state = PARSE;
+      state = PARSE; // NOT IMPLEMENTED
       break;
     case PARSE:
       if (instr_n == instr.length()) {
-        state = WAIT;
+        state = WAIT; // wait for user acknowledgement after food is delivered
       }
       else {
-        current_instr = instr.substring(instr_n, instr_n + 2);
-        if ((int) current_instr.charAt(0) >= 49 && (int) current_instr.charAt(0) <= 57) {
+        current_instr = instr.substring(instr_n, instr_n + 2); // get current instruction
+        if ((int) current_instr.charAt(0) >= 49 && (int) current_instr.charAt(0) <= 57) { // if next instruction is drive, set side and which doorway to stop at
           max_doors = (int) (current_instr.charAt(0)) - 48;
           if (current_instr.charAt(1) == 'r') {
             side = 1;
@@ -299,15 +302,15 @@ void loop() {
       break;
     case TURN:
       if (turn_dir) {
-        turn(90, 150);
+        turn(90, 255);
       }
       else {
-        turn(-90, 150);
+        turn(-90, 255);
       }
       state = FINDWALL;
       break;
     case FINDWALL:
-      r.fwd(150);
+      r.fwd(255);
       if (abs(error) < 150 && abs(last_error[0]) < 150 && abs(last_error[1]) < 150) {
         r.brake();
         state = PARSE;
@@ -330,10 +333,10 @@ void loop() {
       
       if (offset_normalize() < 2.1 || millis() - startup_timer < 5000) {
         if (abs(error) > 200) {
-          r.fwd(150);
+          r.fwd(255);
         }
         else {
-          r.curve(150, c);
+          r.curve(255, c);
         }
         check_last_door = false;
         check_last_door_count = 0;
@@ -375,7 +378,7 @@ void loop() {
           check_last_door = true;
         }
 
-        r.curve(150, side * -5);
+        r.curve(255, side * -8);
       }
       else if (endDoor() && millis() - last_end_door_time > 3000) {
         if (in_out_state > -1) {
@@ -392,24 +395,24 @@ void loop() {
         check_last_door = false;
         check_last_door_count = 0;
 
-        r.curve(150, side * 5);
+        r.curve(255, side * 8);
       }
       else if (in_out_state == 0) {
         if (abs(error) > 200) {
-          r.fwd(150);
+          r.fwd(255);
         }
         else {
-          r.curve(150, c);
+          r.curve(255, c);
         }
       }
       break;
     case ADJUST:
-      r.fwd(150);
+      r.fwd(255);
       if (instr_n + 4 > instr.length()) {
-        delay(50);
+        delay(1);
       }
       else if (instr.charAt(instr_n + 1) == instr.charAt(instr_n + 3)) {
-        delay(50);
+        delay(1);
       }
       else {
         delay(250);
