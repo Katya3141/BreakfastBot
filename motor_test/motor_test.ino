@@ -42,7 +42,7 @@ float dist;
 
 const int d_c = 10;
 const int AVG_HISTORY_LEN = 10;
-const int d_threshhold = 50;
+const int d_threshhold = 20;
 
 float p, i=0, d;
 float d_history[d_c] = {0};
@@ -335,7 +335,7 @@ void loop() {
     error = getDist(rTrig,rEcho) - 40;
   }
   else {
-    error = 10 - getDist(lTrig,lEcho);
+    error = 15 - getDist(lTrig,lEcho);
   }
   
   p = p_w * error;
@@ -344,7 +344,7 @@ void loop() {
   float d_avg;
   float c;
 
-  String instr[] = {"1l", "1r", "r", "1l", "l", "2l", "l", "1r", "r", "3l", "l"};
+  String instr[] = {"2l", "l", "3l", "l", "1r"};
 
   switch(d_state) {
     case WAIT:
@@ -433,7 +433,7 @@ void loop() {
           }
         }
         
-        if(door_measurements >= 3) {
+        if(door_measurements >= 6) {
           d_state = DOORWAY;
           door_count += 1;
           door_timer = millis();
