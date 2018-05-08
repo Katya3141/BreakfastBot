@@ -28,6 +28,7 @@
 #define CHECKIN 9
 #define CHECKOUT 10
 #define ADJUST 11
+#define DOCK 12
 
 #include <WiFi.h>
 #include <mpu9255_esp32.h>
@@ -60,7 +61,7 @@ String instr;
 String current_instr;
 int instr_n = 0;
 
-unsigned long timer, last_measure_time, startup_timer, last_end_door_time, last_start_door_time, last_start_person_time;
+unsigned long timer, last_measure_time, startup_timer, last_end_door_time, last_start_door_time, last_start_person_time, docking_timer;
 
 float getDist(int trig, int echo) {
   float duration, distance;
@@ -288,6 +289,9 @@ void loop() {
           }
           state = STARTUP;
         }
+        else if (cur_instr == "DOCK") {
+          d_state = DOCK;
+        }
         else {
           turn_dir = (current_instr.charAt(1) == 'r');
           state = TURN;
@@ -418,6 +422,16 @@ void loop() {
       state = PARSE;
       in_out_state = 0;
       door_count = 0;
+      break;
+    case DOCK:
+      turn(180, 255);
+      docking_timer = millis();
+      while(millis() - docking_timer < 4000) {
+        r.curveBack(255,25);
+      }
+      r.brake();
+      go = false;
+      d_state = WAIT;
       break;
   }
   
