@@ -321,10 +321,10 @@ void loop() {
       }
       break;
     case DRIVE:
-      if (millis() - last_start_door_time > 4000 && in_out_state == 1) {
+      if (millis() - last_start_door_time > 2800 && in_out_state == 1) {
         in_out_state = 0;
       }
-      if (millis() - last_start_person_time > 4000 && in_out_state == -1) {
+      if (millis() - last_start_person_time > 2800 && in_out_state == -1) {
         in_out_state = 0;
       }
       
@@ -360,6 +360,7 @@ void loop() {
           in_out_state = 1;
           check_last_door = false;
           check_last_door_count = 0;
+          break;
         }
       }
       
@@ -374,7 +375,7 @@ void loop() {
           check_last_door = true;
         }
 
-        r.curve(150, side * -15);
+        r.curve(150, side * -5);
       }
       else if (endDoor() && millis() - last_end_door_time > 3000) {
         if (in_out_state > -1) {
@@ -383,7 +384,7 @@ void loop() {
         if (in_out_state == -1) {
           last_start_person_time = millis();
         }
-        else if (in_out_state == 0 && millis() - last_start_door_time > 600) {
+        else if (in_out_state == 0 && millis() - last_start_door_time > 300) {
           door_count++;
           last_end_door_time = millis();
         }
@@ -391,7 +392,7 @@ void loop() {
         check_last_door = false;
         check_last_door_count = 0;
 
-        r.curve(150, side * 15);
+        r.curve(150, side * 5);
       }
       else if (in_out_state == 0) {
         if (abs(error) > 200) {
@@ -408,7 +409,7 @@ void loop() {
         delay(50);
       }
       else if (instr.charAt(instr_n + 1) == instr.charAt(instr_n + 3)) {
-        delay(100);
+        delay(50);
       }
       else {
         delay(250);
