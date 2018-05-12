@@ -46,6 +46,7 @@ int history = 10;
 
 int state = LISTEN;
 int in_out_state = 0;
+int adjust_count = 0;
 
 int side;
 int max_doors;
@@ -278,6 +279,7 @@ void loop() {
     case DISPENSE:
       choice = getCerealInstructions().toInt();
       postDispState(choice);
+      delay(5000);
       state = PARSE;
       break;
     case PARSE:
@@ -304,6 +306,10 @@ void loop() {
             side = -1;
           }
           state = DOCK;
+        }
+        else if (current_instr.charAt(0) == 'f') {
+          adjust_count = (int) (current_instr.charAt(1)) - 48;
+          state = ADJUST;
         }
         else {
           turn_dir = (current_instr.charAt(1) == 'r');
@@ -424,22 +430,32 @@ void loop() {
       }
       break;
     case ADJUST:
-      if (instr_n + 4 > instr.length()) {
-        //r.back(150);
-        //delay(300);
-      }
-      else if (instr.charAt(instr_n + 1) == instr.charAt(instr_n + 3)) {
-        //r.back(150);
-        //delay(300);
+      if (adjust_count == 0) {
+        if (instr_n + 4 > instr.length()) {
+          
+        }
+        else if (instr.charAt(instr_n + 1) == instr.charAt(instr_n + 3)) {
+
+        }
+        else {
+          r.fwd(150);
+          delay(300);
+        }
+        r.brake();
+        state = PARSE;
+        in_out_state = 0;
+        door_count = 0;
       }
       else {
         r.fwd(150);
         delay(300);
+        r.brake();
+        adjust_count--;
+        
+        if (adjust_count == 0) {
+          state = PARSE;
+        }
       }
-      r.brake();
-      state = PARSE;
-      in_out_state = 0;
-      door_count = 0;
       break;
     case DOCK:
       turn(180, 110);
