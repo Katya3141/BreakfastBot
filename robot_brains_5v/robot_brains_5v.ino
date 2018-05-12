@@ -26,6 +26,7 @@
 #define STARTUP 7
 #define DRIVE 8
 #define ADJUST 9
+#define DOCK 10
 
 #include <WiFi.h>
 #include <mpu9255_esp32.h>
@@ -58,7 +59,7 @@ String instr;
 String current_instr;
 int instr_n = 0;
 
-unsigned long timer, last_measure_time, startup_timer, last_end_door_time, last_start_door_time, last_start_person_time;
+unsigned long timer, last_measure_time, startup_timer, last_end_door_time, last_start_door_time, last_start_person_time, docking_timer;
 
 float getDist(int trig, int echo) {
   float duration, distance;
@@ -204,7 +205,8 @@ void setup() {
   pinMode(led2, OUTPUT);
 
   delay(100); //wait a bit (100 ms)
-  WiFi.begin("MIT"); //attempt to connect to wifi
+  //WiFi.begin("MIT"); //attempt to connect to wifi
+  WiFi.begin("6s08","iesc6s08");
   int count = 0; //count used for Wifi check times
   while (WiFi.status() != WL_CONNECTED && count<6) {
     delay(500);
@@ -290,6 +292,9 @@ void loop() {
             side = -1;
           }
           state = STARTUP;
+        }
+        else if (current_instr == "dd") {
+          state = DOCK;
         }
         else {
           turn_dir = (current_instr.charAt(1) == 'r');
@@ -421,6 +426,15 @@ void loop() {
       state = PARSE;
       in_out_state = 0;
       door_count = 0;
+      break;
+    case DOCK:
+      turn(180, 255);
+      docking_timer = millis();
+      while(millis() - docking_timer < 4000) {
+        r.curveBack(255,25);
+      }
+      r.brake();
+      state = WAIT;
       break;
   }
   

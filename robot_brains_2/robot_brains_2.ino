@@ -44,7 +44,7 @@ float offset[10];
 float normalized[10];
 int history = 10;
 
-int state = TURN;
+int state = LISTEN;
 int in_out_state = 0;
 
 int side;
@@ -207,7 +207,8 @@ void setup() {
   pinMode(led2, OUTPUT);
 
   delay(100); //wait a bit (100 ms)
-  WiFi.begin("MIT"); //attempt to connect to wifi
+  //WiFi.begin("MIT"); //attempt to connect to wifi
+  WiFi.begin("6s08","iesc6s08");
   int count = 0; //count used for Wifi check times
   while (WiFi.status() != WL_CONNECTED && count<6) {
     delay(500);
@@ -236,8 +237,6 @@ void setup() {
   max_curve = weights.substring(space4 + 1).toFloat();
 
   setup_imu();
-
-  side = -1;
 
   timer = millis();
   last_measure_time = millis();
@@ -289,8 +288,14 @@ void loop() {
           }
           state = STARTUP;
         }
-        else if (cur_instr == "DOCK") {
-          d_state = DOCK;
+        else if (current_instr.charAt(0) == 'd') {
+          if (current_instr.charAt(1) == 'r') {
+            side = 1;
+          }
+          else {
+            side = -1;
+          }
+          state = DOCK;
         }
         else {
           turn_dir = (current_instr.charAt(1) == 'r');
@@ -303,10 +308,10 @@ void loop() {
       break;
     case TURN:
       if (turn_dir) {
-        turn(90, 150);
+        turn(80, 100);
       }
       else {
-        turn(-90, 150);
+        turn(-80, 100);
       }
       state = FINDWALL;
       break;
@@ -408,15 +413,17 @@ void loop() {
       }
       break;
     case ADJUST:
-      r.fwd(150);
       if (instr_n + 4 > instr.length()) {
-        delay(50);
+        //r.back(150);
+        //delay(300);
       }
       else if (instr.charAt(instr_n + 1) == instr.charAt(instr_n + 3)) {
-        delay(50);
+        //r.back(150);
+        //delay(300);
       }
       else {
-        delay(250);
+        //r.fwd(150);
+        //delay(300);
       }
       r.brake();
       state = PARSE;
@@ -424,14 +431,15 @@ void loop() {
       door_count = 0;
       break;
     case DOCK:
-      turn(180, 255);
+      turn(180, 110);
       docking_timer = millis();
-      while(millis() - docking_timer < 4000) {
-        r.curveBack(255,25);
+      while(millis() - docking_timer < 1500) {
+        r.curveBack(150,side*25);
       }
+      r.back(150);
+      delay(2500);
       r.brake();
-      go = false;
-      d_state = WAIT;
+      state = LISTEN;
       break;
   }
   
