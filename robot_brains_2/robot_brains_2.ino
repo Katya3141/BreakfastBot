@@ -179,11 +179,11 @@ class Robot {
 
   void curveBack(int spd, int curve) {
     if (curve > 0) {
-      left.back(spd);
+      left.back(spd - offset);
       right.back(spd - curve);
     }
     else {
-      left.back(spd + curve);
+      left.back(spd + curve - offset);
       right.back(spd);
     }
   }
@@ -209,8 +209,8 @@ void setup() {
   pinMode(led2, OUTPUT);
 
   delay(100); //wait a bit (100 ms)
-  //WiFi.begin("MIT"); //attempt to connect to wifi
-  WiFi.begin("6s08","iesc6s08");
+  WiFi.begin("MIT"); //attempt to connect to wifi
+  //WiFi.begin("6s08","iesc6s08");
   int count = 0; //count used for Wifi check times
   while (WiFi.status() != WL_CONNECTED && count<6) {
     delay(500);
@@ -270,7 +270,7 @@ void loop() {
   switch (state) {
     case LISTEN:
       instr = getInstructions();
-      if (instr!="0") {
+      if (instr!="-1") {
         instr_n = 0;
         state = DISPENSE;
       }
@@ -348,7 +348,7 @@ void loop() {
         in_out_state = 0;
       }
       
-      if (offset_normalize() < 2.1 || millis() - startup_timer < 5000) {
+      if (offset_normalize() < 2.1 || millis() - startup_timer < 3000) {
         if (abs(error) > 200) {
           r.fwd(150);
         }
@@ -433,8 +433,8 @@ void loop() {
         //delay(300);
       }
       else {
-        //r.fwd(150);
-        //delay(300);
+        r.fwd(150);
+        delay(300);
       }
       r.brake();
       state = PARSE;
@@ -445,9 +445,9 @@ void loop() {
       turn(180, 110);
       docking_timer = millis();
       while(millis() - docking_timer < 1500) {
-        r.curveBack(150,side*25);
+        r.curveBack(150,side*-10);
       }
-      r.back(150);
+      r.curveBack(150,side*25);
       delay(2500);
       r.brake();
       state = LISTEN;
@@ -588,7 +588,7 @@ void setup_imu() {
 void turn(int dgrees, int spd) {
 
   const float g_const = -0.00077;
-  const float epsilon = 20;
+  const float epsilon = 5;
 
   float angle = 0;
   while(abs(angle-dgrees)>epsilon) {
