@@ -26,22 +26,17 @@ def request_handler(request):
 <body>
 	<br>
 	<select id="mydropdown">
-		<option value="0">Brake</option>
-		<option value="1">Forwards</option>
-		<option value="2">Backwards</option>
-		<option value="3">Turn right</option>
-		<option value="4">Turn left</option>
+		<option value="2l0l1l0l">413</option>
+		<option value="2l0l1r0r">412</option>
+		<option value="2l0r1l0l1r0r">Flounge</option>
+		<option value="2l0r1l0l2l0l1l0l">422</option>
+		<option value="2l0r1l0l2l0l1r0r">423</option>
+		<option value="2l0r1l0l2l0l2r0r">424</option>
 	</select>
 
 	<button onClick="myFunction()" >POST to server</button>
 
 	<br>
-
-	<button onClick="brake()" >Brake</button>
-	<button onClick="forwards()" >Forwards</button>
-	<button onClick="backwards()" >Backwards</button>
-	<button onClick="right()" >Turn Right</button>
-	<button onClick="left()" >Turn Left</button>
 
 	<script type="text/javascript">
 		function myFunction() {
@@ -54,62 +49,6 @@ def request_handler(request):
 			XHR.setRequestHeader('Content-Type', 'application/json');
 			// Finally, send our data.
 			XHR.send("{\"state\":\""+commandString+"\"}");
-		}
-
-		function brake() {
-			//var e = document.getElementById("mydropdown");
-		 	//var command = e.options[e.selectedIndex].value;
-		 	//commandString = String(command);
-		 	var XHR = new XMLHttpRequest();
-			XHR.open('POST', 'http://iesc-s1.mit.edu/608dev/sandbox/pwang21/breakfastbot.py');
-			// Add the required HTTP header for form data POST requests
-			XHR.setRequestHeader('Content-Type', 'application/json');
-			// Finally, send our data.
-			XHR.send("{\"state\":\"0\"}");
-		}
-		function forwards() {
-			//var e = document.getElementById("mydropdown");
-		 	//var command = e.options[e.selectedIndex].value;
-		 	//commandString = String(command);
-		 	var XHR = new XMLHttpRequest();
-			XHR.open('POST', 'http://iesc-s1.mit.edu/608dev/sandbox/pwang21/breakfastbot.py');
-			// Add the required HTTP header for form data POST requests
-			XHR.setRequestHeader('Content-Type', 'application/json');
-			// Finally, send our data.
-			XHR.send("{\"state\":\"1\"}");
-		}
-		function backwards() {
-			//var e = document.getElementById("mydropdown");
-		 	//var command = e.options[e.selectedIndex].value;
-		 	//commandString = String(command);
-		 	var XHR = new XMLHttpRequest();
-			XHR.open('POST', 'http://iesc-s1.mit.edu/608dev/sandbox/pwang21/breakfastbot.py');
-			// Add the required HTTP header for form data POST requests
-			XHR.setRequestHeader('Content-Type', 'application/json');
-			// Finally, send our data.
-			XHR.send("{\"state\":\"2\"}");
-		}
-		function right() {
-			//var e = document.getElementById("mydropdown");
-		 	//var command = e.options[e.selectedIndex].value;
-		 	//commandString = String(command);
-		 	var XHR = new XMLHttpRequest();
-			XHR.open('POST', 'http://iesc-s1.mit.edu/608dev/sandbox/pwang21/breakfastbot.py');
-			// Add the required HTTP header for form data POST requests
-			XHR.setRequestHeader('Content-Type', 'application/json');
-			// Finally, send our data.
-			XHR.send("{\"state\":\"3\"}");
-		}
-		function left() {
-			//var e = document.getElementById("mydropdown");
-		 	//var command = e.options[e.selectedIndex].value;
-		 	//commandString = String(command);
-		 	var XHR = new XMLHttpRequest();
-			XHR.open('POST', 'http://iesc-s1.mit.edu/608dev/sandbox/pwang21/breakfastbot.py');
-			// Add the required HTTP header for form data POST requests
-			XHR.setRequestHeader('Content-Type', 'application/json');
-			// Finally, send our data.
-			XHR.send("{\"state\":\"4\"}");
 		}
 	</script>
 </body>

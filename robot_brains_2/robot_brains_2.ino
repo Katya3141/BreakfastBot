@@ -61,6 +61,8 @@ String instr;
 String current_instr;
 int instr_n = 0;
 
+int choice;
+
 unsigned long timer, last_measure_time, startup_timer, last_end_door_time, last_start_door_time, last_start_person_time, docking_timer;
 
 float getDist(int trig, int echo) {
@@ -219,7 +221,7 @@ void setup() {
   if (WiFi.isConnected()) { //if we connected then print our IP, Mac, and SSID we're on
     Serial.println(WiFi.localIP().toString() + " (" + WiFi.macAddress() + ") (" + WiFi.SSID() + ")");
     delay(500);
-  } else { //if we failed to connect just ry again.
+  } else { //if we failed to connect just try again.
     Serial.println(WiFi.status());
     ESP.restart(); // restart the ESP
   }
@@ -267,9 +269,15 @@ void loop() {
 
   switch (state) {
     case LISTEN:
-      state = DISPENSE;
+      instr = getInstructions();
+      if (instr!="0") {
+        instr_n = 0;
+        state = DISPENSE;
+      }
       break;
     case DISPENSE:
+      choice = getCerealInstructions().toInt();
+      postDispState(choice);
       state = PARSE;
       break;
     case PARSE:
@@ -305,6 +313,9 @@ void loop() {
       }
       break;
     case WAIT:
+      //wait
+      reverseInstructions();
+      state = PARSE;
       break;
     case TURN:
       if (turn_dir) {
@@ -594,6 +605,37 @@ void turn(int dgrees, int spd) {
   r.brake();
 }
 
+void reverseInstructions() {
+  String temp = "";
+  for (int x = instr.length()-2; x >=0; x-+2) {
+//    current_instr = instr.substring(instr_n, instr_n + 2);
+//      if ((int) current_instr.charAt(0) >= 49 && (int) current_instr.charAt(0) <= 57) {
+//        max_doors = (int) (current_instr.charAt(0)) - 48;
+//        if (current_instr.charAt(1) == 'r') {
+//          side = 1;
+//        }
+//        else {
+//          side = -1;
+//        }
+//        state = STARTUP;
+//      }
+//      else if (current_instr.charAt(0) == 'd') {
+//        if (current_instr.charAt(1) == 'r') {
+//          side = 1;
+//        }
+//        else {
+//          side = -1;
+//        }
+//        state = DOCK;
+//      }
+//      else {
+//        turn_dir = (current_instr.charAt(1) == 'r');
+//        state = TURN;
+//      }
+//      instr_n += 2;
+//    }
+  }
+}
 
 String getWeights(){
   WiFiClient client; //instantiate a client object
@@ -624,5 +666,108 @@ String getWeights(){
     Serial.println("connection failed");
     Serial.println("wait 0.5 sec...");
     client.stop();
+  }
+}
+
+String getInstructions(){
+  WiFiClient client; //instantiate a client object
+  if (client.connect("iesc-s1.mit.edu", 80)) { //try to connect to numbersapi.com host
+    // This will send the request to the server
+    // If connected, fire off HTTP GET:
+    client.println("GET /608dev/sandbox/pwang21/breakfastbot.py?query=state HTTP/1.1"); 
+    client.println("Host: iesc-s1.mit.edu");
+    client.print("\r\n");
+    unsigned long count = millis();
+    while (client.connected()) { //while we remain connected read out data coming back
+      String line = client.readStringUntil('\n');
+      //Serial.println(line);
+      if (line == "\r") { //found a blank line!
+        //headers have been received! (indicated by blank line)
+        break;
+      }
+      if (millis()-count>6000) break;
+    }
+    count = millis();
+    String op; //create empty String object
+    while (client.available()) { //read out remaining text (body of response)
+      op+=(char)client.read();
+    }
+    return op;
+    client.stop();
+  }else{
+    Serial.println("connection failed");
+    Serial.println("wait 0.5 sec...");
+    client.stop();
+  }
+}
+
+String getCerealInstructions(){
+  WiFiClient client; //instantiate a client object
+  if (client.connect("iesc-s1.mit.edu", 80)) { //try to connect to numbersapi.com host
+    // This will send the request to the server
+    // If connected, fire off HTTP GET:
+    client.println("GET /608dev/sandbox/pwang21/breakfastbot.py?query=cereal HTTP/1.1"); 
+    client.println("Host: iesc-s1.mit.edu");
+    client.print("\r\n");
+    unsigned long count = millis();
+    while (client.connected()) { //while we remain connected read out data coming back
+      String line = client.readStringUntil('\n');
+      //Serial.println(line);
+      if (line == "\r") { //found a blank line!
+        //headers have been received! (indicated by blank line)
+        break;
+      }
+      if (millis()-count>6000) break;
+    }
+    count = millis();
+    String op; //create empty String object
+    while (client.available()) { //read out remaining text (body of response)
+      op+=(char)client.read();
+    }
+    return op;
+    client.stop();
+  }else{
+    Serial.println("connection failed");
+    Serial.println("wait 0.5 sec...");
+    client.stop();
+  }
+}
+
+void postDispState(int dispState){
+  WiFiClient client; //instantiate a client object
+  if (client.connect("iesc-s1.mit.edu", 80)) { //try to connect
+    // This will send the request to the server
+    // If connected, fire off HTTP GET:
+    String thing = "{\"state\":\""+String(dispState)+"\"}";
+    client.println("POST /608dev/sandbox/kbulovic/dispenser.py HTTP/1.1");
+    client.println("Host: iesc-s1.mit.edu");
+    client.println("Content-Type: application/json");
+    client.println("Content-Length: " + String(thing.length()));
+    client.print("\r\n");
+    client.print(thing);
+    unsigned long count = millis();
+    while (client.connected()) { //while we remain connected read out data coming back
+      String line = client.readStringUntil('\n');
+      Serial.println(line);
+      if (line == "\r") { //found a blank line!
+        //headers have been received! (indicated by blank line)
+        break;
+      }
+      if (millis()-count>6000) break;
+    }
+    count = millis();
+    String op; //create empty String object
+    while (client.available()) { //read out remaining text (body of response)
+      op+=(char)client.read();
+    }
+    Serial.println(op);
+    client.stop();
+    Serial.println();
+    Serial.println("-----------");
+  }else{
+    Serial.println("connection failed");
+    Serial.println("wait 0.5 sec...");
+    client.stop();
+    delay(300);
   }
 }
