@@ -25,13 +25,18 @@ def request_handler(request):
 
 <body>
 	<br>
-	<select id="mydropdown">
-		<option value="2l0l1l0l">413</option>
-		<option value="2l0l1r0r">412</option>
-		<option value="2l0r1l0l1r0r">Flounge</option>
-		<option value="2l0r1l0l2l0l1l0l">422</option>
-		<option value="2l0r1l0l2l0l1r0r">423</option>
-		<option value="2l0r1l0l2l0l2r0r">424</option>
+	<select id="state_dropdown">
+		<option value="1l1r0l1l0l">413</option>
+		<option value="1l1r0l1r0r">412</option>
+		<option value="1l1r0r1l0l1r0r">Flounge</option>
+		<option value="1l1r0r1l0l2l0l1l0l">422</option>
+		<option value="1l1r0r1l0l2l0l1r0r">423</option>
+		<option value="1l1r0r1l0l2l0l2r0r">424</option>
+	</select>
+
+	<select id="cereal_dropdown">
+		<option value="0">CerealA</option>
+		<option value="1">CerealB</option>
 	</select>
 
 	<button onClick="myFunction()" >POST to server</button>
@@ -40,15 +45,18 @@ def request_handler(request):
 
 	<script type="text/javascript">
 		function myFunction() {
-			var e = document.getElementById("mydropdown");
+			var e = document.getElementById("state_dropdown");
 		 	var command = e.options[e.selectedIndex].value;
-		 	commandString = String(command);
+		 	stateString = String(command);
+		 	e = document.getElementById("cereal_dropdown");
+		 	command = e.options[e.selectedIndex].value;
+		 	cerealString = String(command);
 		 	var XHR = new XMLHttpRequest();
 			XHR.open('POST', 'http://iesc-s1.mit.edu/608dev/sandbox/pwang21/breakfastbot.py');
 			// Add the required HTTP header for form data POST requests
 			XHR.setRequestHeader('Content-Type', 'application/json');
 			// Finally, send our data.
-			XHR.send("{\"state\":\""+commandString+"\"}");
+			XHR.send("{\"state\":\""+stateString+"\",\"cereal\":\""+cerealString+"\"}");
 		}
 	</script>
 </body>
