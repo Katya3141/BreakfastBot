@@ -205,8 +205,8 @@ void setup() {
   pinMode(led2, OUTPUT);
 
   delay(100); //wait a bit (100 ms)
-  //WiFi.begin("MIT"); //attempt to connect to wifi
-  WiFi.begin("6s08","iesc6s08");
+  WiFi.begin("MIT"); //attempt to connect to wifi
+  //WiFi.begin("6s08","iesc6s08");
   int count = 0; //count used for Wifi check times
   while (WiFi.status() != WL_CONNECTED && count<6) {
     delay(500);
