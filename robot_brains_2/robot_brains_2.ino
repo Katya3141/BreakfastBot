@@ -270,7 +270,7 @@ void loop() {
   switch (state) {
     case LISTEN:
       instr = getInstructions();
-      if (instr!="0") {
+      if (instr!="-1") {
         instr_n = 0;
         state = DISPENSE;
       }

@@ -13,18 +13,25 @@ def request_handler(request):
             c = conn.cursor()
             try:
                 to_return = c.execute('''SELECT * FROM bot_instr;''').fetchone()
+                if request['values']['query'] == 'cereal':
+                    c.execute('''DELETE FROM bot_instr;''')
                 conn.commit()
                 conn.close()
             except:
-                return '0'
+                return '-1'
+            
+            if not to_return:
+                return '-1'
 
-            if 'query' == 'state':
+            if request['values']['query'] == 'state':
                 return str(to_return[0])
 
-            elif 'query' == 'cereal':
+            elif request['values']['query'] == 'cereal':
                 return str(to_return[1])
+            else:
+                return 'Invalid GET'
             
-        else
+        else:
             return 'Invalid GET'
         
     elif request['method'] == 'POST':
