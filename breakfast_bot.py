@@ -26,17 +26,17 @@ def request_handler(request):
 <body>
 	<br>
 	<select id="state_dropdown">
-		<option value="1l1r0l1l0l">413</option>
-		<option value="1l1r0l1r0r">412</option>
-		<option value="1l1r0r1l0l1r0r">Flounge</option>
-		<option value="1l1r0r1l0l2l0l1l0l">422</option>
-		<option value="1l1r0r1l0l2l0l1r0r">423</option>
-		<option value="1l1r0r1l0l2l0l2r0r">424</option>
+		<option value="1lf20l1l0l">413</option>
+		<option value="1lf20l1r0r">412</option>
+		<option value="1lf20r1l0l1r0r">Flounge</option>
+		<option value="1lf20r1l0l2l0l1l0l">422</option>
+		<option value="1lf20r1l0l2l0l1r0r">423</option>
+		<option value="1lf20r1l0l2l0l2r0r">424</option>
 	</select>
 
 	<select id="cereal_dropdown">
-		<option value="0">CerealA</option>
-		<option value="1">CerealB</option>
+		<option value="1">CerealA</option>
+		<option value="2">CerealB</option>
 	</select>
 
 	<button onClick="myFunction()" >POST to server</button>
