@@ -361,8 +361,6 @@ void loop() {
         else {
           r.curve(150, c);
         }
-        check_last_door = false;
-        check_last_door_count = 0;
         break;
       }
 
@@ -448,7 +446,7 @@ void loop() {
       }
       else {
         r.fwd(150);
-        delay(300);
+        delay(1000);
         r.brake();
         adjust_count--;
         
