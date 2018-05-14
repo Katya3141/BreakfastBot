@@ -12,8 +12,7 @@
 #define lEcho 17
 #define rTrig 14
 #define rEcho 12
-#define fTrig 5
-#define fEcho 15
+#define button 15
 #define led 18
 #define led2 13
 
@@ -36,37 +35,50 @@
 
 MPU9255 imu; //imu object called, appropriately, imu
 
-float p_w, i_w, d_w, max_curve;
+float p_w, i_w, d_w, max_curve; // p, d, i weights; maximum curve value
 const int loop_time = 50;
 
-float last_error[10] = {0};
-float offset[10];
-float normalized[10];
-int history = 10;
+float last_error[10] = {0}; // last 10 error values
+float offset[10]; // last 10 error values, offset from mean
+float normalized[10]; // last 10 error values, offset from mean and normalized to unit vector
+int history = 10; // size of history
 
 int state = LISTEN;
-int in_out_state = 0;
-int adjust_count = 0;
+int in_out_state = 0; // represents whether robot is detecting a door or obstacle
+int adjust_count = 0; // number of adjusts when adjusting multiple times
 
-int side;
-int max_doors;
-bool turn_dir = true;
+int side; // -1 is left, 1 is right
+int max_doors; // number of doors before next instruction should be parsed
+bool turn_dir = true; // false is CCW, true is CW
 
-int startup_count = 0;
-int door_count = 0;
+int startup_count = 0; // number of loops to delay by when in STARTUP state
+int door_count = 0; // number of doorways seen
 
-bool check_last_door;
-int check_last_door_count = 0;
+bool check_last_door; // whether the inwards part of the last door has been seen
+int check_last_door_count = 0; // number of loops to check after last door has been seen
 
-String instr;
-String current_instr;
-int instr_n = 0;
+String instr; // instruction string
+String current_instr; // current 2-character instruction
+int instr_n = 0; // instruction position
+int choice; // cereal choice
 
-int choice;
+const int rightTarget = 40;
+const int leftTarget = 30;
+const int max_door_length = 2800;
+const int min_door_length = 300;
+const int max_obstacle_length = 2800;
+const int startup_period = 3000;
+const float norm_threshhold = 2.1;
+const int min_distance_between_doors = 3000;
+const int min_distance_between_obstacles = 3000;
+const int adjust_time = 300;
+const float start_door_sensitivity = 0.58;
+const float end_door_sensitivity = 0.90;
+
 
 unsigned long timer, last_measure_time, startup_timer, last_end_door_time, last_start_door_time, last_start_person_time, docking_timer;
 
-float getDist(int trig, int echo) {
+float getDist(int trig, int echo) { // gets distance of desired sensor
   float duration, distance;
   
   digitalWrite(trig, LOW);
@@ -204,10 +216,9 @@ void setup() {
   pinMode(lEcho, INPUT);
   pinMode(rTrig, OUTPUT);
   pinMode(rEcho, INPUT);
-  pinMode(fTrig, OUTPUT);
-  pinMode(fEcho, INPUT);
   pinMode(led, OUTPUT);
   pinMode(led2, OUTPUT);
+  pinMode(button, INPUT_PULLUP);
 
   delay(100); //wait a bit (100 ms)
   WiFi.begin("MIT"); //attempt to connect to wifi
@@ -227,7 +238,7 @@ void setup() {
     ESP.restart(); // restart the ESP
   }
 
-  String weights = getWeights();
+  String weights = getWeights(); // gets pid weights
   int space1 = weights.indexOf(" ");
   int space2 = weights.indexOf(" ", space1 + 1);
   int space3 = weights.indexOf(" ", space2 + 1);
@@ -236,7 +247,6 @@ void setup() {
   p_w = weights.substring(0, space1).toFloat();
   i_w = weights.substring(space1 + 1, space2).toFloat();
   d_w = weights.substring(space2 + 1, space3).toFloat();
-  instr = weights.substring(space3 + 1, space4);
   max_curve = weights.substring(space4 + 1).toFloat();
 
   setup_imu();
@@ -247,23 +257,23 @@ void setup() {
 
 void loop() {
 
-  float error, c, p, d, i;
+  float error, c, p, d, i; // error from desired position in hallway
   
   if (side == 1) {
-    error = getDist(rTrig,rEcho) - 40;
+    error = getDist(rTrig,rEcho) - rightTarget;
   }
   else {
-    error = 30 - getDist(lTrig,lEcho);
+    error = leftTarget - getDist(lTrig,lEcho);
   }
 
   p = p_w * error;
   d = d_w * (error - last_error[0]) / (millis() - last_measure_time);
   i += i_w * error * (millis() - last_measure_time);
-  c = p + d + i;
+  c = p + d + i; // amount to curve by
 
   last_measure_time = millis();
 
-  if(c > max_curve)
+  if(c > max_curve) // curve by max amount if c is greater than max_curve
     c = max_curve;
   else if(c < -1 * max_curve)
     c = -1 * max_curve;
@@ -271,24 +281,24 @@ void loop() {
   switch (state) {
     case LISTEN:
       instr = getInstructions();
-      if (instr!="-1") {
+      if (instr!="-1") { // begin trip when valid instructions have been received
         instr_n = 0;
         state = DISPENSE;
       }
       break;
     case DISPENSE:
-      choice = getCerealInstructions().toInt();
+      choice = getCerealInstructions().toInt(); // posts cereal choice to server and waits for dispensing
       postDispState(choice);
       delay(5000);
       state = PARSE;
       break;
     case PARSE:
-      if (instr_n == instr.length()) {
-        state = WAIT;
+      if (instr_n == instr.length()) { // return to listening for instructions after all steps have been completed
+        state = LISTEN;
       }
       else {
         current_instr = instr.substring(instr_n, instr_n + 2);
-        if ((int) current_instr.charAt(0) >= 49 && (int) current_instr.charAt(0) <= 57) {
+        if ((int) current_instr.charAt(0) >= 49 && (int) current_instr.charAt(0) <= 57) { // parse drive command
           max_doors = (int) (current_instr.charAt(0)) - 48;
           if (current_instr.charAt(1) == 'r') {
             side = 1;
@@ -298,7 +308,7 @@ void loop() {
           }
           state = FINDWALL;
         }
-        else if (current_instr.charAt(0) == 'd') {
+        else if (current_instr.charAt(0) == 'd') { // parse dock command
           if (current_instr.charAt(1) == 'r') {
             side = 1;
           }
@@ -307,21 +317,25 @@ void loop() {
           }
           state = DOCK;
         }
-        else if (current_instr.charAt(0) == 'f') {
+        else if (current_instr.charAt(0) == 'f') { // parse forward command
           adjust_count = (int) (current_instr.charAt(1)) - 48;
           state = ADJUST;
         }
+        else if (current_instr.charAt(0) == 'w') { // parse wait command
+          state = WAIT;
+        }
         else {
-          turn_dir = (current_instr.charAt(1) == 'r');
+          turn_dir = (current_instr.charAt(1) == 'r'); // parse turn command
           state = TURN;
         }
         instr_n += 2;
       }
       break;
     case WAIT:
-      //wait
-      reverseInstructions();
-      state = PARSE;
+      if (!digitalRead(button)) {
+        delay(3000);
+        state = PARSE;
+      }
       break;
     case TURN:
       if (turn_dir) {
@@ -332,14 +346,14 @@ void loop() {
       }
       state = PARSE;
       break;
-    case FINDWALL:
+    case FINDWALL: // drive forwards until wall is within 1.5m
       r.fwd(150);
       if (abs(error) < 150 && abs(last_error[0]) < 150 && abs(last_error[1]) < 150) {
         r.brake();
         state = STARTUP;
       }
       break;
-    case STARTUP:
+    case STARTUP: // fill history arrays with non-garbage values
       startup_count++;
       if (startup_count >= history + 5) {
         startup_timer = millis();
@@ -347,14 +361,14 @@ void loop() {
       }
       break;
     case DRIVE:
-      if (millis() - last_start_door_time > 2800 && in_out_state == 1) {
+      if (millis() - last_start_door_time > max_door_length && in_out_state == 1) { // if last door or obstacle was more than 2.8s, reset and do not count a door/obstacle
         in_out_state = 0;
       }
-      if (millis() - last_start_person_time > 2800 && in_out_state == -1) {
+      if (millis() - last_start_person_time > max_obstacle_length && in_out_state == -1) {
         in_out_state = 0;
       }
       
-      if (offset_normalize() < 2.1 || millis() - startup_timer < 3000) {
+      if (offset_normalize() < norm_threshhold || millis() - startup_timer < startup_period) { // check for door after 3 seconds of beginning instruction, if past 10 values have large variance 
         if (abs(error) > 200) {
           r.fwd(150);
         }
@@ -377,7 +391,7 @@ void loop() {
       }
       Serial.println("");
 
-      if (check_last_door) {
+      if (check_last_door) { // if last door opening has been seen, increment count
         check_last_door_count++;
         if (check_last_door_count > 5) {
           state = ADJUST;
@@ -388,7 +402,7 @@ void loop() {
         }
       }
       
-      if (startDoor() && millis() - last_start_door_time > 750 && millis() - last_end_door_time > 3000) {
+      if (startDoor() && millis() - last_start_door_time > 750 && millis() - last_end_door_time > min_distance_between_doors) { // recognize start of door / end of obstacle
 
         if (in_out_state < 1) {
           in_out_state++;
@@ -399,23 +413,23 @@ void loop() {
           check_last_door = true;
         }
       }
-      else if (endDoor() && millis() - last_end_door_time > 3000) {
+      else if (endDoor() && millis() - last_end_door_time > min_distance_between_obstacles) { // recognize start of obstacle / end of door
         if (in_out_state > -1) {
           in_out_state--;
         }
         if (in_out_state == -1) {
           last_start_person_time = millis();
         }
-        else if (in_out_state == 0 && millis() - last_start_door_time > 300) {
+        else if (in_out_state == 0 && millis() - last_start_door_time > min_door_length) {
           door_count++;
           last_end_door_time = millis();
         }
         
-        check_last_door = false;
+        check_last_door = false; // if door ended very quickly, it was probably a misread, invalidate
         check_last_door_count = 0;
 
       }
-      else if (in_out_state < 1) {
+      else if (in_out_state < 1) { // follow the wall in normal operation or when detecting an obstacle
         if (abs(error) > 200) {
           r.fwd(150);
         }
@@ -423,12 +437,12 @@ void loop() {
           r.curve(150, c);
         }
       }
-      else {        
+      else { // drive straight when detecting a doorway
         r.curve(150, side * -5);
       }
       break;
     case ADJUST:
-      if (adjust_count == 0) {
+      if (adjust_count == 0) { // adjust position based on next instruction
         if (instr_n + 4 > instr.length()) {
           
         }
@@ -437,27 +451,27 @@ void loop() {
         }
         else {
           r.fwd(150);
-          delay(600);
+          delay(300);
         }
         r.brake();
         state = PARSE;
         in_out_state = 0;
         door_count = 0;
       }
-      else {
+      else { // if multiple adjusts are needed
         r.fwd(150);
-        delay(300);
-        r.brake();
+        delay(adjust_time);
         adjust_count--;
         
         if (adjust_count == 0) {
+          r.brake();
           state = PARSE;
           in_out_state = 0;
           door_count = 0;
         }
       }
       break;
-    case DOCK:
+    case DOCK: // turn 180 degrees and curve into box
       turn(180, 110);
       docking_timer = millis();
       while(millis() - docking_timer < 1500) {
@@ -492,11 +506,11 @@ void loop() {
   Serial.print(check_last_door_count);
   Serial.println("");
 
-  for (int i = history-1; i > 0; i--) {
+  for (int i = history-1; i > 0; i--) { // update history
     last_error[i] = last_error[i-1];
   }
 
-  if (error < -200) {
+  if (error < -200) { // error is capped at 200
     error = -200;
   }
   else if (error > 200) {
@@ -565,7 +579,7 @@ bool startDoor() {
   Serial.println("");
   Serial.println("-----------------------------------");
 
-  return (sum > 0.58 && sum2 < sum + 0.05 && sum2 < 0.95);
+  return (sum > start_door_sensitivity && sum2 < sum + 0.05 && sum2 < 0.95);
 }
 bool endDoor() {
   float sum = 0;
@@ -582,7 +596,7 @@ bool endDoor() {
     sum2 += normalized[i] * w / 9.083 * side;
   }
 
-  return (sum > 0.90 && sum2 < sum + 0.05 && sum2 < 0.95);
+  return (sum > end_door_sensitivity && sum2 < sum + 0.05 && sum2 < 0.95);
   
   //return (side * (last_error[0] + last_error[1] + last_error[2] - last_error[3] - last_error[4] - last_error[5]) < -1 * dif_threshhold);
 }
