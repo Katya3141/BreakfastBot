@@ -296,7 +296,7 @@ void loop() {
           else {
             side = -1;
           }
-          state = STARTUP;
+          state = FINDWALL;
         }
         else if (current_instr.charAt(0) == 'd') {
           if (current_instr.charAt(1) == 'r') {
@@ -325,18 +325,18 @@ void loop() {
       break;
     case TURN:
       if (turn_dir) {
-        turn(80, 100);
+        turn(90, 100);
       }
       else {
-        turn(-80, 100);
+        turn(-90, 100);
       }
-      state = FINDWALL;
+      state = PARSE;
       break;
     case FINDWALL:
       r.fwd(150);
       if (abs(error) < 150 && abs(last_error[0]) < 150 && abs(last_error[1]) < 150) {
         r.brake();
-        state = PARSE;
+        state = STARTUP;
       }
       break;
     case STARTUP:
@@ -398,8 +398,6 @@ void loop() {
           last_start_door_time = millis();
           check_last_door = true;
         }
-
-        r.curve(150, side * -5);
       }
       else if (endDoor() && millis() - last_end_door_time > 3000) {
         if (in_out_state > -1) {
@@ -416,15 +414,17 @@ void loop() {
         check_last_door = false;
         check_last_door_count = 0;
 
-        r.curve(150, side * 5);
       }
-      else if (in_out_state == 0) {
+      else if (in_out_state < 1) {
         if (abs(error) > 200) {
           r.fwd(150);
         }
         else {
           r.curve(150, c);
         }
+      }
+      else {        
+        r.curve(150, side * -5);
       }
       break;
     case ADJUST:
@@ -437,7 +437,7 @@ void loop() {
         }
         else {
           r.fwd(150);
-          delay(300);
+          delay(600);
         }
         r.brake();
         state = PARSE;
@@ -446,12 +446,14 @@ void loop() {
       }
       else {
         r.fwd(150);
-        delay(1000);
+        delay(300);
         r.brake();
         adjust_count--;
         
         if (adjust_count == 0) {
           state = PARSE;
+          in_out_state = 0;
+          door_count = 0;
         }
       }
       break;
@@ -563,7 +565,7 @@ bool startDoor() {
   Serial.println("");
   Serial.println("-----------------------------------");
 
-  return (sum > 0.5 && sum2 < sum + 0.05 && sum2 < 0.95);
+  return (sum > 0.58 && sum2 < sum + 0.05 && sum2 < 0.95);
 }
 bool endDoor() {
   float sum = 0;
@@ -580,7 +582,7 @@ bool endDoor() {
     sum2 += normalized[i] * w / 9.083 * side;
   }
 
-  return (sum > 0.65 && sum2 < sum + 0.05 && sum2 < 0.95);
+  return (sum > 0.90 && sum2 < sum + 0.05 && sum2 < 0.95);
   
   //return (side * (last_error[0] + last_error[1] + last_error[2] - last_error[3] - last_error[4] - last_error[5]) < -1 * dif_threshhold);
 }
@@ -602,10 +604,11 @@ void setup_imu() {
 void turn(int dgrees, int spd) {
 
   const float g_const = -0.00077;
-  const float epsilon = 5;
+  const float epsilon = 20;
 
   float angle = 0;
   while(abs(angle-dgrees)>epsilon) {
+    Serial.println("degrees: " + String(dgrees) + "   target angle: " + String(angle));
     if(dgrees > 0)
       r.turnRight(spd);
     else {
