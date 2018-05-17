@@ -24,10 +24,8 @@
 #define FINDWALL 6
 #define STARTUP 7
 #define DRIVE 8
-#define CHECKIN 9
-#define CHECKOUT 10
-#define ADJUST 11
-#define DOCK 12
+#define ADJUST 9
+#define DOCK 10
 
 #include <WiFi.h>
 #include <mpu9255_esp32.h>
@@ -62,18 +60,18 @@ String current_instr; // current 2-character instruction
 int instr_n = 0; // instruction position
 int choice; // cereal choice
 
-const int rightTarget = 40;
-const int leftTarget = 30;
-const int max_door_length = 2800;
+const int rightTarget = 35;
+const int leftTarget = 35;
+const int max_door_length = 5000;
 const int min_door_length = 300;
 const int max_obstacle_length = 2800;
 const int startup_period = 3000;
 const float norm_threshhold = 2.1;
-const int min_distance_between_doors = 3000;
-const int min_distance_between_obstacles = 3000;
+const int min_distance_between_doors = 1000;
+const int min_distance_between_obstacles = 1000;
 const int adjust_time = 300;
-const float start_door_sensitivity = 0.58;
-const float end_door_sensitivity = 0.90;
+const float start_door_sensitivity = 0.70;
+const float end_door_sensitivity = 0.92;
 
 
 unsigned long timer, last_measure_time, startup_timer, last_end_door_time, last_start_door_time, last_start_person_time, docking_timer;
@@ -221,8 +219,8 @@ void setup() {
   pinMode(button, INPUT_PULLUP);
 
   delay(100); //wait a bit (100 ms)
-  WiFi.begin("MIT"); //attempt to connect to wifi
-  //WiFi.begin("6s08","iesc6s08");
+  //WiFi.begin("MIT"); //attempt to connect to wifi
+  WiFi.begin("6s08","iesc6s08");
   int count = 0; //count used for Wifi check times
   while (WiFi.status() != WL_CONNECTED && count<6) {
     delay(500);
@@ -378,7 +376,7 @@ void loop() {
         break;
       }
 
-      
+/*      
       for (int i = 0; i < history; i++) {
         Serial.print(normalized[i]);
         Serial.print(" ");
@@ -390,6 +388,7 @@ void loop() {
         Serial.print(" ");
       }
       Serial.println("");
+*/
 
       if (check_last_door) { // if last door opening has been seen, increment count
         check_last_door_count++;
@@ -402,7 +401,7 @@ void loop() {
         }
       }
       
-      if (startDoor() && millis() - last_start_door_time > 750 && millis() - last_end_door_time > min_distance_between_doors) { // recognize start of door / end of obstacle
+      if (startDoor() && millis() - last_start_door_time > 750 && millis() - last_end_door_time > min_distance_between_doors && millis() - startup_timer > startup_period) { // recognize start of door / end of obstacle
 
         if (in_out_state < 1) {
           in_out_state++;
@@ -413,7 +412,7 @@ void loop() {
           check_last_door = true;
         }
       }
-      else if (endDoor() && millis() - last_end_door_time > min_distance_between_obstacles) { // recognize start of obstacle / end of door
+      else if (endDoor() && millis() - last_end_door_time > min_distance_between_obstacles && millis() - startup_timer > startup_period) { // recognize start of obstacle / end of door
         if (in_out_state > -1) {
           in_out_state--;
         }
@@ -450,8 +449,7 @@ void loop() {
 
         }
         else {
-          r.fwd(150);
-          delay(300);
+
         }
         r.brake();
         state = PARSE;
@@ -497,6 +495,7 @@ void loop() {
     digitalWrite(led2, LOW);
   }
 
+/*
   Serial.print(door_count);
   Serial.print(" ");
   Serial.print(in_out_state);
@@ -505,6 +504,7 @@ void loop() {
   Serial.print(" ");
   Serial.print(check_last_door_count);
   Serial.println("");
+*/
 
   for (int i = history-1; i > 0; i--) { // update history
     last_error[i] = last_error[i-1];
@@ -538,7 +538,7 @@ float offset_normalize() {
     sum += last_error[i];
   }
   float avg = sum / history;
-  
+
   for (int i = 0; i < history; i++) {
     offset[i] = last_error[i] - avg;
   }
@@ -552,9 +552,6 @@ float offset_normalize() {
   for (int i = 0; i < history; i++) {
     normalized[i] = offset[i] / norm;
   }
-
-  Serial.println(norm);
-
   return norm;
 }
 
@@ -573,11 +570,13 @@ bool startDoor() {
     sum2 += normalized[i] * w / 9.083 * side;
   }
 
+/*
   Serial.print(sum);
   Serial.print(" ");
   Serial.print(sum2);
   Serial.println("");
   Serial.println("-----------------------------------");
+*/
 
   return (sum > start_door_sensitivity && sum2 < sum + 0.05 && sum2 < 0.95);
 }
@@ -634,38 +633,6 @@ void turn(int dgrees, int spd) {
     delay(100);
   }
   r.brake();
-}
-
-void reverseInstructions() {
-  String temp = "";
-  for (int x = instr.length()-2; x >=0; x-+2) {
-//    current_instr = instr.substring(instr_n, instr_n + 2);
-//      if ((int) current_instr.charAt(0) >= 49 && (int) current_instr.charAt(0) <= 57) {
-//        max_doors = (int) (current_instr.charAt(0)) - 48;
-//        if (current_instr.charAt(1) == 'r') {
-//          side = 1;
-//        }
-//        else {
-//          side = -1;
-//        }
-//        state = STARTUP;
-//      }
-//      else if (current_instr.charAt(0) == 'd') {
-//        if (current_instr.charAt(1) == 'r') {
-//          side = 1;
-//        }
-//        else {
-//          side = -1;
-//        }
-//        state = DOCK;
-//      }
-//      else {
-//        turn_dir = (current_instr.charAt(1) == 'r');
-//        state = TURN;
-//      }
-//      instr_n += 2;
-//    }
-  }
 }
 
 String getWeights(){

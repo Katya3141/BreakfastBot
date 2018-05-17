@@ -1,5 +1,6 @@
 
 import requests
+import datetime
 import sqlite3
 import json
 
@@ -12,9 +13,10 @@ def request_handler(request):
             conn = sqlite3.connect(db)
             c = conn.cursor()
             try:
-                to_return = c.execute('''SELECT * FROM bot_instr;''').fetchone()
+                to_return = c.execute('''SELECT * FROM bot_req ORDER BY time ASC;''').fetchone()
                 if request['values']['query'] == 'cereal':
-                    c.execute('''DELETE FROM bot_instr;''')
+                    time = to_return[2]
+                    c.execute('''DELETE FROM bot_req WHERE time = ?;''',(time,))
                 conn.commit()
                 conn.close()
             except:
@@ -46,12 +48,11 @@ def request_handler(request):
             c = conn.cursor()
             
             try:
-                c.execute('''CREATE TABLE bot_instr (instr text, cereal int);''')
+                c.execute('''CREATE TABLE bot_req (instr text, cereal int, time timestamp);''')
             except:
                 pass           
 
-            c.execute('''DELETE FROM bot_instr;''')
-            c.execute('''INSERT into bot_instr VALUES (?,?);''', (state,cereal))
+            c.execute('''INSERT into bot_req VALUES (?,?,?);''', (state,cereal, datetime.datetime.now()))
             
             conn.commit()
             conn.close()
